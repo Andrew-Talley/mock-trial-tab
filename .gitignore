@@ -1,0 +1,6 @@
+node_modules
+yarn.lock
+**/__pycache__
+graphql.schema.json
+**/__generated__
+**/*.pyc

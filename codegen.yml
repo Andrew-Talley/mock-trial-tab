@@ -1,0 +1,14 @@
+overwrite: true
+schema: "./schema.graphql"
+# documents: "src/**/*.graphql"
+generates:
+  src/__generated__/graphql.ts:
+    plugins:
+      - "typescript"
+      - "typescript-operations"
+    config:
+      scalars:
+        Side: "'P' | 'D'"
+  ./graphql.schema.json:
+    plugins:
+      - "introspection"

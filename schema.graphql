@@ -1,0 +1,41 @@
+enum Side {
+  PL
+  DEF
+}
+
+type Tournament {
+  name: String!
+
+  teams: [Team!]!
+}
+
+type Team {
+  number: Int!
+  name: String!
+}
+
+type Matchup {
+  pl: Team!
+  def: Team!
+
+  ballots: [Ballot!]
+}
+
+type Score {
+  score: Int!
+}
+
+type Ballot {
+  matchup: Matchup!
+  judge: Judge
+
+  winner: Side
+}
+
+type Judge {
+  name: String!
+}
+
+type Query {
+  stuff: String!
+}

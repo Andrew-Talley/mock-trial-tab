@@ -4,3 +4,4 @@ yarn.lock
 graphql.schema.json
 **/__generated__
 **/*.pyc
+py-env/**

@@ -1,41 +1,49 @@
-enum Side {
-  PL
-  DEF
-}
-
-type Tournament {
-  name: String!
-
-  teams: [Team!]!
-}
-
-type Team {
-  number: Int!
-  name: String!
-}
-
-type Matchup {
-  pl: Team!
-  def: Team!
-
-  ballots: [Ballot!]
-}
-
-type Score {
-  score: Int!
-}
-
-type Ballot {
-  matchup: Matchup!
-  judge: Judge
-
-  winner: Side
-}
-
 type Judge {
+  id: ID!
   name: String!
+  tournamentId: ID!
+  conflicts: [School]!
+}
+
+type Mutation {
+  addTournament(name: String!): Tournament
+  addJudgeConflict(judgeId: ID!, school: String!, tournamentId: ID!): Judge
+  addJudge(name: String!, tournamentId: ID!): Judge
+  addTeam(name: String!, num: Int!, school: String!, tournament: ID!): Team
+  addSchool(name: String!, tournament: ID!): School
 }
 
 type Query {
-  stuff: String!
+  tournaments: [Tournament]!
+  tournament(id: Int!): Tournament!
 }
+
+type Round {
+  roundNum: Int!
+}
+
+type School {
+  tournamentId: ID
+  name: String
+  teams: [Team]
+}
+
+type Team {
+  name: String!
+  num: Int!
+  schoolName: String!
+  school: School!
+  tournamentId: ID!
+}
+
+type Tournament {
+  id: ID!
+  name: String!
+  schools: [School]
+  teams: [Team]
+  school(name: String!): School!
+  judges: [Judge]!
+  judge(id: ID!): Judge!
+  rounds: [Round]!
+}
+

@@ -5,3 +5,4 @@ from models.tournament import Tournament
 from models.matchup import Matchup
 from models.round import Round
 from models.ballot import Ballot
+from models.student import Student

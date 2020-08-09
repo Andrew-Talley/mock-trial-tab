@@ -202,6 +202,34 @@ class GraphQLTestCase(unittest.TestCase):
 
     self.assertEqual(matchup['pl']['num'], pl_num, "π num does not match")
     self.assertEqual(matchup['def']['num'], def_num, "∆ num does not match")
+
+  def _get_students(self, team_num):
+    result = schema.execute(f"""
+      query getStudents {{
+        tournament(id: {self.tourn_id}) {{
+          team(num: {team_num}) {{
+            students {{
+              id
+              name
+            }}
+          }}
+        }}
+      }}
+    """)
+
+    students = result.data['tournament']['team']['students']
+    
+    return students
+
+  def assertTeamHasNumStudents(self, team_num, num_students):
+    students_list = self._get_students(team_num)
+    true_num_students = len(students_list)
+
+    self.assertEqual(num_students, true_num_students, expected_len("student", num_students, true_num_students))
+
+  def assertTeamHasStudent(self, team_num, student_name):
+    students = [student['name'] for student in self._get_students(team_num)]
+    self.assertIn(student_name, students, f"{student_name} not found in students for team {team_num}")
     
 
 class TestGraphQLServer(GraphQLTestCase):
@@ -328,6 +356,25 @@ class TestGraphQLServer(GraphQLTestCase):
 
     return [match['id'] for match in newRound['matchups']]
 
+  def add_student_to_team(self, team_num, student_name):
+    result = schema.execute(f"""
+      mutation addStudent {{
+        addStudentToTeam(tournamentId: {self.tourn_id}, team: {team_num}, name: "{student_name}") {{
+          num
+          students {{
+            name
+          }}
+        }}
+      }}
+    """)
+
+    if result.errors:
+      raise Exception(result.errors)
+
+    newTeam = result.data['addStudentToTeam']
+
+    return newTeam
+
   def assign_ballot(self, matchup_id, judge_id):
     result = schema.execute(f"""
       mutation assignBallot {{
@@ -351,6 +398,10 @@ class TestGraphQLServer(GraphQLTestCase):
       "judge": newBallot['judge']['id'],
       "matchup": newBallot['matchup']['id']
     }
+
+  def create_midlands_a(self):
+    self.add_school_to_tournament("Midlands University")
+    self.add_team_to_tournament(1001, "Midlands University", "Midlands University A")
 
   def add_default_team_matrix(self):
     self.add_school_to_tournament("Midlands University")
@@ -496,10 +547,23 @@ class TestGraphQLServer(GraphQLTestCase):
     self.assertJudgeHasBallot(judge_id, new_ballot['id'])
     self.assertMatchupHasBallot(matchup_id, new_ballot['id'])
 
-  #   self.assertHasNumRounds(0)
-  #   matchups = self.add_round(1, [{"pl": 1001, "def": 1101}, {"pl": 1002, "def": 1102}])
-  #   self.assertHasNumRounds(1)
-  #   self.find_matchup_test(matchups[0], 1001, 1101)
+  def test_teams_start_with_no_students(self):
+    self.create_midlands_a()
+    self.assertTeamHasNumStudents(1001, 0)
 
+  def test_can_add_students(self):
+    self.create_midlands_a()
 
-  #   self.tearDown()
+    new_team = self.add_student_to_team(1001, "Elizabeth Bayes")
+    new_students = [student['name'] for student in new_team['students']]
+
+    self.assertIn("Elizabeth Bayes", new_students, "New student not returned from addStudent mutation")
+    self.assertTeamHasStudent(1001, "Elizabeth Bayes")
+    self.assertTeamHasNumStudents(1001, 1)
+
+  def test_cannot_add_duplicate_student(self):
+    self.create_midlands_a()
+    self.add_student_to_team(1001, "Elizabeth Bayes")
+
+    with self.assertRaises(BaseException):
+      stuff = self.add_student_to_team(1001, "Elizabeth Bayes")

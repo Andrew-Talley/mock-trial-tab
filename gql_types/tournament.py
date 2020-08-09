@@ -1,6 +1,6 @@
 import graphene
 
-from models import Tournament as SQLTournament, Judge as SQLJudge
+from models import Tournament as SQLTournament, Judge as SQLJudge, Team as SQLTeam
 
 from gql_types.main_types import School, Team, Judge, Matchup
 from gql_types.round import Round
@@ -16,11 +16,16 @@ class Tournament(graphene.ObjectType):
     schools = [School(tournament_id=school['tournament_id'], name=school['name']) for school in schools_info]
     return schools
 
-  teams = graphene.List(Team)
+  teams = graphene.List(Team, required=True)
   @staticmethod
   def resolve_teams(parent, info):
     teams = SQLTournament.get_teams_for_tournament(parent.id)
-    return teams
+    return [Team(tournament_id=parent.id, num=team['num'], name=team['name'], school_name=team['school_name']) for team in teams]
+
+  team = graphene.Field(Team, args={"num": graphene.Argument(graphene.Int, required=True)}, required=True)
+  @staticmethod
+  def resolve_team(parent, info, num):
+    return Team(tournament_id=parent.id, num=num,)
 
   school = graphene.Field(School, args={
     "name": graphene.Argument(graphene.String, required=True)

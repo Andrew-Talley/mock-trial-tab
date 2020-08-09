@@ -1,5 +1,7 @@
 import graphene
-from models import School as SQLSchool, Judge as SQLJudge, Matchup as SQLMatchup
+from graphene import NonNull
+import models
+from models import School as SQLSchool, Judge as SQLJudge, Matchup as SQLMatchup, Team as SQLTeam
 
 class School(graphene.ObjectType):
   tournament_id = graphene.ID()
@@ -10,16 +12,33 @@ class School(graphene.ObjectType):
   @staticmethod
   def resolve_teams(parent, info):
     teams = SQLSchool.get_teams_for_school(parent.tournament_id, parent.name)
-    return [Team(num=team['num'], name=team['name']) for team in teams]
+    return [Team(tournament_id=parent.tournament_id, num=team['num'], name=team['name']) for team in teams]
 
 class Team(graphene.ObjectType):
   name = graphene.String(required=True)
+  def resolve_name(parent, info):
+    try:
+      return parent.name
+    except:
+      team = SQLTeam.get_team(parent.tournament_id, parent.num)
+      return team['name']
+  
   num = graphene.Int(required=True)
 
   school_name = graphene.String(required=True)
-  school = graphene.NonNull(School)
+  school = NonNull(School)
 
   tournament_id = graphene.ID(required=True)
+
+  students = NonNull(graphene.List(lambda: Student, required=True))
+  @staticmethod
+  def resolve_students(parent, info):
+    students = models.Team.get_students(parent.tournament_id, parent.num)
+    return [Student(id=student['id'], name=student['name']) for student in students]
+
+class Student(graphene.ObjectType):
+  id = graphene.ID(required=True)
+  name = graphene.String(required=True)
 
 class Ballot(graphene.ObjectType):
   id = graphene.ID(required=True)

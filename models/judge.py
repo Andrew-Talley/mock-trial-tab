@@ -2,6 +2,7 @@ from models.connection import db, tables
 
 judge_table = tables['judge']
 conflict_table = tables['conflict']
+ballots_table = tables['ballot']
 
 class Judge:
   @staticmethod
@@ -43,3 +44,12 @@ class Judge:
     conflicts = [name for (name, ) in cursor.fetchall()]
 
     return conflicts
+
+  @staticmethod
+  def get_ballots(tournament_id: int, judge_id: int):
+    cursor = db.cursor()
+    cursor.execute(f"SELECT id FROM {ballots_table} WHERE judge_id = %s", (judge_id, ))
+
+    ballot_ids = [judge_id for (judge_id, ) in cursor.fetchall()]
+
+    return ballot_ids

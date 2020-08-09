@@ -145,6 +145,42 @@ class GraphQLTestCase(unittest.TestCase):
     true_num_rounds = len(rounds)
 
     self.assertEqual(num_rounds, true_num_rounds, expected_len("round", num_rounds, true_num_rounds))
+
+  def assertJudgeHasBallot(self, judge_id, ballot_id):
+    result = schema.execute(f"""
+      query judgeBallots {{
+        tournament(id: {self.tourn_id}) {{
+          judge(id: {judge_id}) {{
+            ballots {{
+              id
+            }}
+          }}
+        }}
+      }}
+    """)
+
+    true_ballots = result.data['tournament']['judge']['ballots']
+
+    has_ballot = any(ballot['id'] == ballot_id for ballot in true_ballots)
+    self.assertTrue(has_ballot, f"Ballot {ballot_id} not found in ballots for judge {judge_id}")
+
+  def assertMatchupHasBallot(self, matchup_id, ballot_id):
+    result = schema.execute(f"""
+      query matchupBallots {{
+        tournament(id: {self.tourn_id}) {{
+          matchup(id: {matchup_id}) {{
+            ballots {{
+              id
+            }}
+          }}
+        }}
+      }}
+    """)
+
+    true_ballots = result.data['tournament']['matchup']['ballots']
+
+    has_ballot = any(ballot['id'] == ballot_id for ballot in true_ballots)
+    self.assertTrue(has_ballot, f"Ballot {ballot_id} not found in ballots for judge {ballot_id}")
     
 
 class TestGraphQLServer(GraphQLTestCase):
@@ -264,6 +300,7 @@ class TestGraphQLServer(GraphQLTestCase):
         addManualRound(tournamentId: {self.tourn_id}, matchups: [{serialized_matchups}]) {{
           roundNum
           matchups {{
+            id
             pl {{
               num
             }}
@@ -281,6 +318,54 @@ class TestGraphQLServer(GraphQLTestCase):
 
     serialized_matchups = [{"pl": match['pl']['num'], "def": match['def']['num']} for match in newRound['matchups']]
     self.assertEqual(matchups, serialized_matchups)
+
+    return [match['id'] for match in newRound['matchups']]
+
+  def assign_ballot(self, matchup_id, judge_id):
+    result = schema.execute(f"""
+      mutation assignBallot {{
+        assignJudgeToMatchup(matchup: {matchup_id}, judge: {judge_id}) {{
+          id
+          judge {{
+            id
+          }}
+          matchup {{
+            id
+          }}
+        }}
+      }}
+    """)
+
+    newBallot = result.data['assignJudgeToMatchup']
+    true_judge_id = newBallot['judge']['id']
+    true_matchup_id = newBallot['matchup']['id']
+    self.assertEqual(judge_id, true_judge_id, "judge_id does not match true judge_id")
+    self.assertEqual(matchup_id, true_matchup_id, "judge_id does not match true judge_id")
+
+    return newBallot['id']
+
+  def find_matchup_test(self, id, pl_num, def_num):
+    result = schema.execute(f"""
+      query matchupTest {{
+        tournament(id: {self.tourn_id}) {{
+          matchup(id: {id}) {{
+            pl {{
+              num
+            }}
+            def {{
+              num
+            }}
+          }}
+        }}
+      }}
+    """)
+
+    print(result)
+
+    matchup = result.data['tournament']['matchup']
+
+    self.assertEqual(matchup['pl']['num'], pl_num, "π num does not match")
+    self.assertEqual(matchup['def']['num'], def_num, "∆ num does not match")
 
   def test_everything(self):
     self.create_tournament_test()
@@ -320,6 +405,10 @@ class TestGraphQLServer(GraphQLTestCase):
     self.add_judge_conflict(roberts_id, "Midlands University")
 
     self.assertHasNumRounds(0)
-    self.add_round(1, [{"pl": 1001, "def": 1101}, {"pl": 1002, "def": 1102}])
+    matchups = self.add_round(1, [{"pl": 1001, "def": 1101}, {"pl": 1002, "def": 1102}])
     self.assertHasNumRounds(1)
-    
+    self.find_matchup_test(matchups[0], 1001, 1101)
+
+    new_ballot = self.assign_ballot(matchups[0], roberts_id)
+    self.assertJudgeHasBallot(roberts_id, new_ballot)
+    self.assertMatchupHasBallot(matchups[0], new_ballot)

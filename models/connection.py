@@ -16,5 +16,6 @@ tables = {
   "conflict": "JudgeConflict",
   "matchup": "Matchup",
   "ballot": "Ballot",
-  "student": "Student"
+  "student": "Student",
+  "role": "Role"
 }

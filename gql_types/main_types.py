@@ -1,7 +1,10 @@
 import graphene
 from graphene import NonNull
+
 import models
 from models import School as SQLSchool, Judge as SQLJudge, Matchup as SQLMatchup, Team as SQLTeam
+
+from gql_types.role import Role
 
 class School(graphene.ObjectType):
   tournament_id = graphene.ID()
@@ -45,21 +48,39 @@ class Ballot(graphene.ObjectType):
   matchup = graphene.Field(lambda: Matchup, required=True)
   judge = graphene.Field(lambda: Judge, required=True)
 
+class MatchupTeam(graphene.ObjectType):
+  tournament_id = graphene.ID(required=True)
+  matchup_id = graphene.ID(required=True)
+  team_num = graphene.Int(required=True)
+
+  team = graphene.Field(Team, required=True)
+  @staticmethod
+  def resolve_team(parent, info):
+    return Team(num=parent.team_num)
+
+  student_in_role = graphene.Field(Student, args={"role": graphene.Argument(Role, required=True)})
+  @staticmethod
+  def resolve_student_in_role(parent, info, role):
+    student_id = models.Role.get_student_in_role(parent.tournament_id, parent.matchup_id, parent.team_num, role)
+    return Student(id=student_id)
+
 class Matchup(graphene.ObjectType):
   id = graphene.ID(required=True)
 
-  pl = graphene.Field(Team, required=True)
-  defense = graphene.Field(Team, required=True, name="def")
+  pl = graphene.Field(MatchupTeam, required=True)
+  defense = graphene.Field(MatchupTeam, required=True, name="def")
 
   @staticmethod
   def resolve_pl(parent, info):
     match = SQLMatchup.get_matchup(parent.id)
-    return Team(num=match['pl'])
+    t_id, p_id = match.get('tournament_id'), match.get('pl')
+    return MatchupTeam(team_num=match['pl'], tournament_id=t_id, matchup_id=parent.id)
 
   @staticmethod
   def resolve_defense(parent, info):
     match = SQLMatchup.get_matchup(parent.id)
-    return Team(num=match['def'])
+    t_id, d_id = match.get('tournament_id'), match.get('def')
+    return MatchupTeam(team_num=d_id, tournament_id=parent.id, matchup_id=parent.id)
 
   ballots = graphene.List(Ballot)
   @staticmethod

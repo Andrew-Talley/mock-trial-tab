@@ -16,10 +16,11 @@ class Matchup:
   @staticmethod
   def get_matchup(matchup_id):
     cursor = db.cursor()
-    cursor.execute(f"SELECT pl_num, def_num, round_num FROM {matchup_table} WHERE id = %s", (matchup_id, ))
+    cursor.execute(f"SELECT tournament_id, pl_num, def_num, round_num FROM {matchup_table} WHERE id = %s", (matchup_id, ))
 
-    (pl_num, def_num, round_num) = cursor.fetchone()
+    (tourn_id, pl_num, def_num, round_num) = cursor.fetchone()
     return {
+      "tournament_id": tourn_id,
       "pl": pl_num,
       "def": def_num,
       "round_num": round_num

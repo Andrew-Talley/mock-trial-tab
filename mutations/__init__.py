@@ -6,6 +6,7 @@ from models import Tournament as SQLTournament, Team as SQLTeam, Judge as SQLJud
 from mutations.add_manual_round import AddManualRound
 from mutations.assign_judge_to_matchup import AssignJudgeToMatchup
 from mutations.add_student_to_team import AddStudentToTeam
+from mutations.assign_student_to_role import AssignStudentToRole
 
 class CreateTournament(graphene.Mutation):
   class Arguments:
@@ -76,7 +77,9 @@ class Mutation(graphene.ObjectType):
 
   add_school = AddSchool.Field()
   add_team = AddTeam.Field()
+
   add_student_to_team = AddStudentToTeam.Field()
+  assign_student_to_role = AssignStudentToRole.Field()
 
   add_manual_round = AddManualRound.Field()
 

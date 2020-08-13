@@ -32,6 +32,6 @@
     "load-gql-schema": "get-graphql-schema http://localhost:5000/graphql > schema.graphql",
     "collect-coverage": "coverage-3.8 run -m unittest tab_rounds/**/test*.py gql_server/tests/*.py",
     "output-coverage": "coverage report --omit='py-env/*,**/test_*'",
-    "format": "black **/*.py --exclude='py-env/**/*.py'"
+    "format": "black **/*.py --exclude='py-env/.'"
   }
 }

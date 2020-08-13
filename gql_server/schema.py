@@ -10,26 +10,33 @@ from models.school import School as SQLSchool
 from models.team import Team as SQLTeam
 from models.judge import Judge as SQLJudge
 
-class TournamentQuery():
-  tournament = graphene.Field(Tournament, args={
-    "id": graphene.Argument(graphene.Int, required=True)
-  }, required=True)
 
-  @staticmethod
-  def resolve_tournament(parent, info, id):
-    return Tournament(id=id)
+class TournamentQuery:
+    tournament = graphene.Field(
+        Tournament,
+        args={"id": graphene.Argument(graphene.Int, required=True)},
+        required=True,
+    )
 
-class TournamentsQuery():
-  tournaments = graphene.Field(graphene.List(Tournament), required=True)
+    @staticmethod
+    def resolve_tournament(parent, info, id):
+        return Tournament(id=id)
 
-  @staticmethod
-  def resolve_tournaments(parent, info):
-    tournaments = SQLTournament.get_all_tournaments()
-    return [Tournament(id=tournament['id'], name=tournament['name']) for tournament in tournaments]
+
+class TournamentsQuery:
+    tournaments = graphene.Field(graphene.List(Tournament), required=True)
+
+    @staticmethod
+    def resolve_tournaments(parent, info):
+        tournaments = SQLTournament.get_all_tournaments()
+        return [
+            Tournament(id=tournament["id"], name=tournament["name"])
+            for tournament in tournaments
+        ]
+
 
 class Query(graphene.ObjectType, TournamentQuery, TournamentsQuery):
-  pass
+    pass
+
 
 schema = graphene.Schema(query=Query, mutation=Mutation)
-
-

@@ -657,3 +657,15 @@ class TestGraphQLServer(GraphQLTestCase):
     self.assign_student_to_role(matchup, 1001, bayes_id, "MIDDLE")
 
     self.assertStudentHasRole(bayes_id, "MIDDLE", matchup, "pl")
+
+  def test_can_assign_student_to_w1(self):
+    matchup_ids = self.add_default_r1_setup()
+    bayes_id = self.add_elizabeth_bayes()
+
+    matchup = matchup_ids[0]
+
+    result = schema.execute(f"""
+      mutation assignStudentWitnessOrder {{
+        assignStudent
+      }}
+    """)

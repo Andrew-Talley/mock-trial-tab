@@ -3,9 +3,6 @@ from tab_rounds.generate_round.ranks_map import RanksMap
 from itertools import chain, zip_longest
 from collections import defaultdict
 
-def map_pairs(pairs):
-  return [[pair[0]['id'], pair[1]['id']] for pair in pairs]
-
 class PairSet():
   def __init__(self):
     self.__set__ = set()

@@ -12,6 +12,12 @@ from mutations.add_manual_round import AddManualRound
 from mutations.assign_judge_to_matchup import AssignJudgeToMatchup
 from mutations.add_student_to_team import AddStudentToTeam
 from mutations.assign_student_to_role import AssignStudentToRole
+from mutations.assign_witness_order import AssignWitnessOrder
+from mutations.assign_attorney_to_direct import AssignAttorneyToDirect
+from mutations.assign_cross_order import AssignCrossOrder
+from mutations.assign_witness_name import AssignWitnessName
+from mutations.assign_speech_score import AssignSpeechScore
+from mutations.assign_exam_score import AssignExamScore
 
 
 class CreateTournament(graphene.Mutation):
@@ -94,7 +100,15 @@ class Mutation(graphene.ObjectType):
 
     add_manual_round = AddManualRound.Field()
 
-    add_judge = AddJudge.Field()
-    add_judge_conflict = AddJudgeConflict.Field()
+    add_judge = AddJudge.Field(required=True)
+    add_judge_conflict = AddJudgeConflict.Field(required=True)
+    assign_judge_to_matchup = AssignJudgeToMatchup.Field(required=True)
 
-    assign_judge_to_matchup = AssignJudgeToMatchup.Field()
+    assign_witness_order = AssignWitnessOrder.Field(required=True)
+    assign_attorney_to_direct = AssignAttorneyToDirect.Field(required=True)
+    assign_cross_order = AssignCrossOrder.Field(required=True)
+    assign_witness_name = AssignWitnessName.Field(required=True)
+
+    assign_speech_score = AssignSpeechScore.Field(required=True)
+
+    assign_exam_score = AssignExamScore.Field(required=True)

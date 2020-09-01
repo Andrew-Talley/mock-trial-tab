@@ -3,669 +3,851 @@ import unittest
 from gql_server.schema import schema
 from models.tournament import Tournament
 
-def expected_len(type, expected, found):
-  return f"Expected to see {expected} {type}s, but had {found} instead"
+from .assertions import GraphQLTestCase
 
-class GraphQLTestCase(unittest.TestCase):
-  tourn_id: int
-
-  def assertStringIsInt(self, number):
-    try:
-      int(number)
-      return True
-    except:
-      return False
-
-  def get_all_tournaments(self):
-    result = schema.execute(f"""
-      query getTournaments {{
-        tournaments {{
-          id
-          name
-        }}
-      }}
-    """)
-
-    return result.data['tournaments']
-
-  def assertHasNumSchools(self, num_schools):
-    result = schema.execute(f"""
-      query numSchools {{
-        tournament(id: {self.tourn_id}) {{
-          schools {{
-            name
-          }}
-        }}
-      }}
-    """)
-
-    school_list = result.data['tournament']['schools']
-    true_num_schools = len(school_list)
-
-    self.assertEqual(true_num_schools, num_schools, expected_len("school", num_schools, true_num_schools))
-
-  def assertHasNumTeams(self, num_teams):
-    result = schema.execute(f"""
-      query numTeams {{
-        tournament(id: {self.tourn_id}) {{
-          teams {{
-            name
-          }}
-        }}
-      }}
-    """)
-
-    team_list = result.data['tournament']['teams']
-    true_num_teams = len(team_list)
-
-    self.assertEqual(true_num_teams, num_teams, expected_len("team", num_teams, true_num_teams))
-
-  def assertSchoolHasNumTeams(self, school, num_teams):
-    result = schema.execute(f"""
-      query numTeams {{
-        tournament(id: {self.tourn_id}) {{
-          school(name: "{school}") {{
-            name
-            teams {{
-              num
-            }}
-          }}
-        }}
-      }}
-    """)
-
-    teams = result.data['tournament']['school']['teams']
-    true_num_teams = len(teams)
-
-    self.assertEqual(num_teams, true_num_teams, expected_len("team", num_teams, true_num_teams))
-
-  def assertSchoolContainsTeam(self, school, team_num, team_name):
-    result = schema.execute(f"""
-      query numTeams {{
-        tournament(id: {self.tourn_id}) {{
-          school(name: "{school}") {{
-            teams {{
-              num
-              name
-            }}
-          }}
-        }}
-      }}
-    """)
-    teams = result.data['tournament']['school']['teams']
-    has_team = any(team['name'] == team_name and team['num'] == team_num for team in teams)
+class TestGraphQLServerBase(GraphQLTestCase):
+    def _to_GQL_bool(self, value):
+        return "true" if value else "false"
     
-    team_ids = ", ".join(str(team['num']) for team in teams)
-    self.assertTrue(has_team, f"Team {team_num} not found. Team numbers: {team_ids} (also check the names)")
+    def setUp(self):
+        self.create_tournament()
 
-  def assertTournamentHasNumJudges(self, num_judges):
-    result = schema.execute(f"""
-      query numTeams {{
-        tournament(id: {self.tourn_id}) {{
-          judges {{
-            id
-          }}
-        }}
-      }}
-    """)
-    
-    judges = result.data['tournament']['judges']
-    true_num_judges = len(judges)
+    def tearDown(self):
+        Tournament.delete_tournament(self.tourn_id)
 
-    self.assertEqual(num_judges, true_num_judges, expected_len("judge", num_judges, true_num_judges))
+        super().tearDown()
 
-  def assertJudgeHasConflict(self, judge_id, school):
-    result = schema.execute(f"""
-      query judgeConflict {{
-        tournament(id: {self.tourn_id}) {{
-          judge(id: {judge_id}) {{
-            conflicts {{
-              name
+    def create_tournament(self):
+        result = schema.execute(
+            """
+            mutation makeTournament {
+                addTournament(name: "Test Tournament") {
+                    id 
+                    name
+                }
+            }
+            """
+        )
+        new_tourn_data = result.data["addTournament"]
+        self.tourn_id = new_tourn_data["id"]
+
+        return new_tourn_data
+
+    def add_school_to_tournament(self, name):
+        result = schema.execute(
+            f"""
+            mutation addSchool {{
+                addSchool(tournament: {self.tourn_id}, name: "{name}") {{
+                    name
+                }}
             }}
-          }}
-        }}
-      }}
-    """)
+            """
+        )
 
-    conflicts = result.data['tournament']['judge']['conflicts']
-    self.assertTrue(any(conflict['name'] == school for conflict in conflicts), f"School {school} not found in conflicts for judge {judge_id}")
+        new_school_data = result.data["addSchool"]
 
-  def assertHasNumRounds(self, num_rounds):
-    result = schema.execute(f"""
-      query roundsInTournament {{
-        tournament(id: {self.tourn_id}) {{
-          rounds {{
-            roundNum
-          }}
-        }}
-      }}
-    """)
+        return new_school_data
 
-    rounds = result.data['tournament']['rounds']
-    true_num_rounds = len(rounds)
+    def add_team_to_tournament(self, team_num, school, team_name):
+        result = schema.execute(
+            f"""
+            mutation addTeam {{
+                addTeam(tournament: {self.tourn_id}, school: "{school}", num: {team_num}, name: "{team_name}") {{
+                    num
+                    name
 
-    self.assertEqual(num_rounds, true_num_rounds, expected_len("round", num_rounds, true_num_rounds))
-
-  def assertJudgeHasBallot(self, judge_id, ballot_id):
-    result = schema.execute(f"""
-      query judgeBallots {{
-        tournament(id: {self.tourn_id}) {{
-          judge(id: {judge_id}) {{
-            ballots {{
-              id
+                    schoolName
+                    tournamentId
+                }}
             }}
-          }}
-        }}
-      }}
-    """)
+            """
+        )
 
-    true_ballots = result.data['tournament']['judge']['ballots']
+        new_team = result.data["addTeam"]
 
-    has_ballot = any(ballot['id'] == ballot_id for ballot in true_ballots)
-    self.assertTrue(has_ballot, f"Ballot {ballot_id} not found in ballots for judge {judge_id}")
+        return new_team
 
-  def assertMatchupHasBallot(self, matchup_id, ballot_id):
-    result = schema.execute(f"""
-      query matchupBallots {{
-        tournament(id: {self.tourn_id}) {{
-          matchup(id: {matchup_id}) {{
-            ballots {{
-              id
+    def add_judge_to_tournament(self, name):
+        result = schema.execute(
+            f"""
+            mutation addJudge {{
+                addJudge(tournamentId: {self.tourn_id}, name: "{name}") {{
+                    id
+                    name
+                }}
             }}
-          }}
-        }}
-      }}
-    """)
+            """
+        )
 
-    true_ballots = result.data['tournament']['matchup']['ballots']
+        new_judge = result.data["addJudge"]
 
-    has_ballot = any(ballot['id'] == ballot_id for ballot in true_ballots)
-    self.assertTrue(has_ballot, f"Ballot {ballot_id} not found in ballots for judge {ballot_id}")
+        return new_judge
 
-  def assertHasMatchup(self, matchup_id, pl_num, def_num):
-    result = schema.execute(f"""
-      query matchupTest {{
-        tournament(id: {self.tourn_id}) {{
-          matchup(id: {matchup_id}) {{
-            pl {{
-              team {{
-                num
-              }}
+    def get_judge_info(self, judge_id):
+        result = schema.execute(
+            f"""
+            query getJudge {{
+                tournament(id: {self.tourn_id}) {{
+                    judge(id: {judge_id}) {{
+                        name
+                    }}
+                }}
             }}
-            def {{
-              team {{
-                num
-              }}
+            """
+        )
+
+        judge = result.data["tournament"]["judge"]
+
+        return judge
+
+    def add_judge_conflict(self, judge_id, school):
+        result = schema.execute(
+            f"""
+            mutation addConflict {{
+                addJudgeConflict(tournamentId: {self.tourn_id}, judgeId: "{judge_id}", school: "{school}") {{
+                    id
+                }}
             }}
-          }}
-        }}
-      }}
-    """)
+            """
+        )
 
-    matchup = result.data['tournament']['matchup']
+    def add_round(self, round_num, matchups):
+        serialized_matchups = [
+            ("{" + ", ".join(f"{k}: {v}" for k, v in matchup.items()) + "}")
+            for matchup in matchups
+        ]
 
-    self.assertEqual(matchup['pl']['team']['num'], pl_num, "π num does not match")
-    self.assertEqual(matchup['def']['team']['num'], def_num, "∆ num does not match")
+        serialized_matchups = ", ".join(serialized_matchups)
 
-  def _get_students(self, team_num):
-    result = schema.execute(f"""
-      query getStudents {{
-        tournament(id: {self.tourn_id}) {{
-          team(num: {team_num}) {{
-            students {{
-              id
-              name
+        result = schema.execute(
+            f"""
+            mutation generateRound {{
+                addManualRound(tournamentId: {self.tourn_id}, matchups: [{serialized_matchups}]) {{
+                    roundNum
+                    matchups {{
+                        id
+                        pl {{
+                            team {{
+                                num
+                            }}
+                        }}
+                        def {{
+                            team {{
+                                num
+                            }}
+                        }}
+                    }}
+                }}
             }}
-          }}
-        }}
-      }}
-    """)
+            """
+        )
 
-    students = result.data['tournament']['team']['students']
-    
-    return students
+        newRound = result.data["addManualRound"]
 
-  def assertTeamHasNumStudents(self, team_num, num_students):
-    students_list = self._get_students(team_num)
-    true_num_students = len(students_list)
+        serialized_matchups = [
+            {"pl": match["pl"]["team"]["num"], "def": match["def"]["team"]["num"]}
+            for match in newRound["matchups"]
+        ]
 
-    self.assertEqual(num_students, true_num_students, expected_len("student", num_students, true_num_students))
+        return [match["id"] for match in newRound["matchups"]]
 
-  def assertTeamHasStudent(self, team_num, student_name):
-    students = [student['name'] for student in self._get_students(team_num)]
-    self.assertIn(student_name, students, f"{student_name} not found in students for team {team_num}")
+    def add_student_to_team(self, team_num, student_name):
+        result = schema.execute(
+            f"""
+            mutation addStudent {{
+                addStudentToTeam(tournamentId: {self.tourn_id}, team: {team_num}, name: "{student_name}") {{
+                    team {{
+                        num
+                    }}
+                    student {{
+                        id
+                        name
+                    }}
+                }}
+            }}
+            """
+        )
 
-  def assertStudentHasRole(self, student_id, role, matchup, side):
-    result = schema.execute(f"""
-      query getRole {{
-        tournament(id: {self.tourn_id}) {{
-          matchup(id: {matchup}) {{
-            {side} {{
-              studentInRole(role: {role}) {{
+        if result.errors:
+            raise Exception(result.errors)
+
+        newTeam = result.data["addStudentToTeam"]
+
+        return newTeam
+
+    def assign_ballot(self, matchup_id, judge_id):
+        result = schema.execute(
+            f"""
+            mutation assignBallot {{
+                assignJudgeToMatchup(matchup: {matchup_id}, judge: {judge_id}) {{
                 id
-              }}
+                judge {{
+                    id
+                }}
+                matchup {{
+                    id
+                }}
+                }}
             }}
-          }}
-        }}
-      }}
-    """)
+            """
+        )
 
-    student_in_role = result.data['tournament']['matchup'][side]['studentInRole']
-    self.assertIsNotNone(student_in_role, f"No student assigned to {role}")
-    self.assertEqual(student_in_role['id'], student_id, f"Student {student_id} does not have role {role}")    
+        newBallot = result.data["assignJudgeToMatchup"]
 
-class TestGraphQLServer(GraphQLTestCase):
-  def setUp(self):
-    self.create_tournament()
-
-  def tearDown(self):
-    Tournament.delete_tournament(self.tourn_id)
-
-    return super().tearDown()
-
-  def create_tournament(self):
-    result = schema.execute("""
-      mutation makeTournament {
-        addTournament(name: "Test Tournament") {
-          id 
-          name
+        return {
+            "id": newBallot["id"],
+            "judge": newBallot["judge"]["id"],
+            "matchup": newBallot["matchup"]["id"],
         }
-      }
-    """)
-    new_tourn_data = result.data['addTournament']
-    self.tourn_id = new_tourn_data['id']
 
-    return new_tourn_data
-
-  def add_school_to_tournament(self, name):
-    result = schema.execute(f"""
-      mutation addSchool {{
-        addSchool(tournament: {self.tourn_id}, name: "{name}") {{
-          name
-        }}
-      }}
-    """)
-
-    new_school_data = result.data['addSchool']
-    
-    return new_school_data
-
-  def add_team_to_tournament(self, team_num, school, team_name):
-    result = schema.execute(f"""
-      mutation addTeam {{
-        addTeam(tournament: {self.tourn_id}, school: "{school}", num: {team_num}, name: "{team_name}") {{
-          num
-          name
-
-          schoolName
-          tournamentId
-        }}
-      }}
-    """)
-
-    new_team = result.data['addTeam']
-
-    return new_team
-
-  def add_judge_to_tournament(self, name):
-    result = schema.execute(f"""
-      mutation addJudge {{
-        addJudge(tournamentId: {self.tourn_id}, name: "{name}") {{
-          id
-          name
-        }}
-      }}
-    """)
-
-    new_judge = result.data['addJudge']
-
-    return new_judge
-
-  def get_judge_info(self, judge_id):
-    result = schema.execute(f"""
-      query getJudge {{
-        tournament(id: {self.tourn_id}) {{
-          judge(id: {judge_id}) {{
-            name
-          }}
-        }}
-      }}
-    """)
-
-    judge = result.data['tournament']['judge']
-
-    return judge
-
-  def add_judge_conflict(self, judge_id, school):
-    result = schema.execute(f"""
-      mutation addConflict {{
-        addJudgeConflict(tournamentId: {self.tourn_id}, judgeId: "{judge_id}", school: "{school}") {{
-          id
-        }}
-      }}
-    """)
-
-  def add_round(self, round_num, matchups):
-    serialized_matchups = [
-      ("{" + ", ".join(f"{k}: {v}" for k,v in matchup.items()) + "}") for matchup in matchups
-    ]
-
-    serialized_matchups = ", ".join(serialized_matchups)
-
-    result = schema.execute(f"""
-      mutation generateRound {{
-        addManualRound(tournamentId: {self.tourn_id}, matchups: [{serialized_matchups}]) {{
-          roundNum
-          matchups {{
-            id
-            pl {{
-              team {{
-                num
-              }}
+    def assign_student_to_role(self, matchup, team, student, role):
+        result = schema.execute(
+            f"""
+            mutation assignToOpening {{
+                assignStudentToRole(tournamentId: {self.tourn_id}, matchup: {matchup}, team: {team}, student: {student}, role: {role}) {{
+                    matchup {{
+                        id
+                    }}
+                    student {{
+                        id
+                    }}
+                    role
+                }}
             }}
-            def {{
-              team {{
-                num
-              }}
+            """
+        )
+
+        assignment = result.data["assignStudentToRole"]
+
+        return assignment
+
+    def assign_witness_to_order(self, matchup, side, student, order):
+        result = schema.execute(
+            f"""
+            mutation assignStudentWitnessOrder {{
+                assignWitnessOrder(tournament: {self.tourn_id}, matchup: {matchup}, side: {side}, student: {student}, order: {order}) {{
+                    matchup {{
+                        id
+                    }}
+                    student {{
+                        id
+                    }}
+                    order
+                }}
             }}
-          }}
-        }}
-      }}
-    """)
-
-    newRound = result.data['addManualRound']
-    
-    self.assertEqual(newRound['roundNum'], round_num)
-
-    serialized_matchups = [{"pl": match['pl']['team']['num'], "def": match['def']['team']['num']} for match in newRound['matchups']]
-    self.assertEqual(matchups, serialized_matchups)
-
-    return [match['id'] for match in newRound['matchups']]
-
-  def add_student_to_team(self, team_num, student_name):
-    result = schema.execute(f"""
-      mutation addStudent {{
-        addStudentToTeam(tournamentId: {self.tourn_id}, team: {team_num}, name: "{student_name}") {{
-          num
-          students {{
-            id
-            name
-          }}
-        }}
-      }}
-    """)
-
-    if result.errors:
-      raise Exception(result.errors)
-
-    newTeam = result.data['addStudentToTeam']
-
-    return newTeam
-
-  def assign_ballot(self, matchup_id, judge_id):
-    result = schema.execute(f"""
-      mutation assignBallot {{
-        assignJudgeToMatchup(matchup: {matchup_id}, judge: {judge_id}) {{
-          id
-          judge {{
-            id
-          }}
-          matchup {{
-            id
-          }}
-        }}
-      }}
-    """)
-
-
-    newBallot = result.data['assignJudgeToMatchup']
-
-    return {
-      "id": newBallot['id'],
-      "judge": newBallot['judge']['id'],
-      "matchup": newBallot['matchup']['id']
-    }
-
-  def assign_student_to_role(self, matchup, team, student, role):
-    result = schema.execute(f"""
-      mutation assignToOpening {{
-        assignStudentToRole(tournamentId: {self.tourn_id}, matchup: {matchup}, team: {team}, student: {student}, role: {role}) {{
-          matchup {{
-            id
-          }}
-          student {{
-            id
-          }}
-          role
-        }}
-      }}
-    """)
-
-    assignment = result.data['assignStudentToRole']
-
-    return assignment
-
-  def create_midlands_a(self):
-    self.add_school_to_tournament("Midlands University")
-    self.add_team_to_tournament(1001, "Midlands University", "Midlands University A")
-
-  def add_default_team_matrix(self):
-    self.add_school_to_tournament("Midlands University")
-    self.add_school_to_tournament("Midlands State University")
-
-    self.add_team_to_tournament(1001, "Midlands University", "Midlands University A")
-    self.add_team_to_tournament(1002, "Midlands University", "Midlands University B")
-
-    self.add_team_to_tournament(1101, "Midlands State University", "Midlands State University A")
-    self.add_team_to_tournament(1102, "Midlands State University", "Midlands State University B")
-
-  def add_elizabeth_bayes(self):
-    team = self.add_student_to_team(1001, "Elizebth Bayes")
-    return team['students'][0]['id']
-
-  def add_default_r1_setup(self):
-    self.add_default_team_matrix()
-    matchups = self.add_round(1, [{"pl": 1001, "def": 1101}, {"pl": 1002, "def": 1102}])
-    return matchups
-
-  def add_default_judges(self):
-    roberts = self.add_judge_to_tournament("John G. Roberts, Jr.")
-    avenatti = self.add_judge_to_tournament("Michael Avenatti")
-
-    return [roberts, avenatti]
-
-  def test_create_tournament(self):
-    new_tourn_data = self.create_tournament()
-
-    self.assertStringIsInt(self.tourn_id)
-    self.assertEqual(new_tourn_data['name'], 'Test Tournament')
-
-  def test_get_all_tournamnets(self):
-    tournaments = self.get_all_tournaments()
-    new_tournament = tournaments[0]
+            """
+        )
+
+        assignment = result.data["assignWitnessOrder"]
+
+        return assignment
+
+    def assign_attorney_to_order(self, matchup, side, student, order):
+        result = schema.execute(
+            f"""
+                mutation assignAttorneyDirect {{
+                    assignAttorneyToDirect(
+                        tournament: {self.tourn_id}, matchup: {matchup}, side: {side}, student: {student}, order: {order}
+                    ) {{
+                        matchup {{
+                            id
+                        }}
+                        student {{
+                            id
+                        }}
+                        order
+                    }}
+                }}
+            """
+        )
+
+        assignment = result.data['assignAttorneyToDirect']
+
+        return assignment
+
+    def assign_cross(self, matchup, side, student, order):
+        result = schema.execute(
+            f"""
+            mutation assignCrossExamination {{
+                assignCrossOrder(tournament: {self.tourn_id}, matchup: {matchup}, side: {side}, student: {student}, order: {order}) {{
+                    matchup {{
+                        id
+                    }}
+                    student {{
+                        id
+                    }}
+                    team {{
+                        num
+                    }}
+                    order
+                }}
+            }}
+            """
+        )
+
+        assignment = result.data['assignCrossOrder']
+
+        return assignment
+
+    def assign_witness_name(self, matchup, side, order, name):
+        result = schema.execute(
+            f"""
+            mutation assignWitnessName {{
+                assignWitnessName(tournament: {self.tourn_id}, matchup: {matchup}, side: {side}, order: {order}, witness: "{name}") {{
+                    matchup {{
+                        id
+                    }}
+                    witnessName
+                }}
+            }}
+            """
+        )
+
+        assignment = result.data['assignWitnessName']
+
+        return assignment
+
+    def create_midlands_a(self):
+        self.add_school_to_tournament("Midlands University")
+        self.add_team_to_tournament(
+            1001, "Midlands University", "Midlands University A"
+        )
+
+    def add_default_team_matrix(self):
+        self.add_school_to_tournament("Midlands University")
+        self.add_school_to_tournament("Midlands State University")
+
+        self.add_team_to_tournament(
+            1001, "Midlands University", "Midlands University A"
+        )
+        self.add_team_to_tournament(
+            1002, "Midlands University", "Midlands University B"
+        )
+
+        self.add_team_to_tournament(
+            1101, "Midlands State University", "Midlands State University A"
+        )
+        self.add_team_to_tournament(
+            1102, "Midlands State University", "Midlands State University B"
+        )
+
+    def add_elizabeth_bayes(self):
+        result = self.add_student_to_team(1001, "Elizebth Bayes")
+        return result["student"]["id"]
+
+    def add_num_students_to_team(self, num_students, team):
+        students = []
+
+        for student_num in range(num_students):
+            result = self.add_student_to_team(team, f"Student {student_num}")
+            students.append(result['student']['id'])
+
+        return students
+
+    def add_default_r1_setup(self):
+        self.add_default_team_matrix()
+        matchups = self.add_round(
+            1, [{"pl": 1001, "def": 1101}, {"pl": 1002, "def": 1102}]
+        )
+        return matchups
+
+    def add_one_matchup_setup(self):
+        self.add_school_to_tournament("Midlands University")
+        self.add_school_to_tournament("Midlands State University")
+
+        self.add_team_to_tournament(
+            1001, "Midlands University", "Midlands University A"
+        )
+        self.add_team_to_tournament(
+            1101, "Midlands State University", "Midlands State University A"
+        )
+
+        matchup = self.add_round(1, [{"pl": 1001, "def": 1101}])
+
+        return matchup[0]
+
+    def add_one_matchup_w_judge(self):
+        matchup = self.add_one_matchup_setup()
+        judge = self.add_judge_to_tournament("John G. Roberts, Jr.")['id']
+        ballot = self.assign_ballot(matchup, judge)['id']
+
+        return (matchup, judge, ballot)
+
+    def add_default_judges(self):
+        roberts = self.add_judge_to_tournament("John G. Roberts, Jr.")
+        avenatti = self.add_judge_to_tournament("Michael Avenatti")
+
+        return [roberts, avenatti]
+
+    def assign_speech_score(self, ballot, side, speech, score):
+        result = schema.execute(
+            f"""
+            mutation openingScore {{
+                assignSpeechScore(ballot: {ballot}, side: {side}, speech: {speech}, score: {score})
+            }}
+            """
+        )
+        
+        score = result.data['assignSpeechScore']
+
+        return score
+
+    def assign_exam_score(self, ballot, side, exam, witness, cross, score):
+        result = schema.execute(
+            f"""
+                mutation addWitnessScore {{
+                    assignExamScore(ballot: {ballot}, side: {side}, exam: {exam}, witness: {self._to_GQL_bool(witness)}, cross: {self._to_GQL_bool(cross)}, score: {score})
+                }}
+            """
+        )
+
+        return result.data['assignExamScore']
+
+    def assign_full_round(self, ballot, pd):
+        return
+
+class TestTournamentsTeamsAndSchools(TestGraphQLServerBase):
+    def test_create_tournament(self):
+        new_tourn_data = self.create_tournament()
+
+        self.assertStringIsInt(self.tourn_id)
+        self.assertEqual(new_tourn_data["name"], "Test Tournament")
+
+    def test_get_all_tournamnets(self):
+        tournaments = self.get_all_tournaments()
+        new_tournament = tournaments[0]
+
+        self.assertEqual(new_tournament["name"], "Test Tournament")
+
+    def test_starts_with_no_schools(self):
+        self.assertHasNumSchools(0)
+
+    def test_add_school(self):
+        new_school = self.add_school_to_tournament("Midlands University")
+        self.assertEqual(new_school["name"], "Midlands University")
+        self.assertHasNumSchools(1)
+
+    def test_add_multiple_schools(self):
+        self.add_school_to_tournament("Midlands University")
+        self.add_school_to_tournament("Midlands State University")
+        self.assertHasNumSchools(2)
+
+    def test_starts_with_no_teams(self):
+        self.assertHasNumTeams(0)
+
+    def test_school_starts_with_no_teams(self):
+        self.add_school_to_tournament("Midlands University")
+        self.assertSchoolHasNumTeams("Midlands University", 0)
+
+    def test_add_team(
+        self, school="Midlands University", team="Midlands University A", num=1001
+    ):
+        self.add_school_to_tournament("Midlands University")
+        new_team = self.add_team_to_tournament(num, school, team)
+
+        self.assertEqual(new_team["num"], num)
+        self.assertEqual(new_team["name"], team)
+        self.assertEqual(new_team["schoolName"], school)
+        self.assertEqual(new_team["tournamentId"], self.tourn_id)
+
+        self.assertSchoolHasNumTeams(school, 1)
+        self.assertSchoolContainsTeam(school, num, team)
+
+    def test_add_multiple_teams(self):
+        self.add_school_to_tournament("Midlands University")
+        self.add_school_to_tournament("Midlands State University")
+        self.add_team_to_tournament(
+            1001, "Midlands University", "Midlands University A"
+        )
+        self.assertHasNumTeams(1)
+
+        self.add_team_to_tournament(
+            1101, "Midlands State University", "Midlands State University A"
+        )
+        self.assertHasNumTeams(2)
+
+    def test_school_starts_without_team(self):
+        self.test_add_school()
+        with self.assertRaises(AssertionError):
+            self.assertSchoolContainsTeam(
+                "Midlands University", 1001, "Midlands University A"
+            )
+
+    def test_school_has_teams_after_add(self):
+        self.add_school_to_tournament("Midlands University")
+        self.add_team_to_tournament(
+            1001, "Midlands University", "Midlands University A"
+        )
+        self.assertSchoolContainsTeam(
+            "Midlands University", 1001, "Midlands University A"
+        )
+
+class TestMatchups(TestGraphQLServerBase):
+    def test_starts_with_no_rounds(self):
+        self.assertHasNumRounds(0)
+
+    def test_can_add_manual_round(self):
+        self.add_default_team_matrix()
+        matchups = self.add_round(
+            1, [{"pl": 1001, "def": 1101}, {"pl": 1002, "def": 1102}]
+        )
+        self.assertHasNumRounds(1)
+        self.assertHasMatchup(matchups[0], 1001, 1101)
+        self.assertHasMatchup(matchups[1], 1002, 1102)
+
+class TestJudges(TestGraphQLServerBase):
+    def test_tournament_starts_with_no_judges(self):
+        self.assertTournamentHasNumJudges(0)
+
+    def test_can_add_judge(self):
+        roberts = self.add_judge_to_tournament("John G. Roberts, Jr.")
+        self.assertStringIsInt(roberts["id"])
+        self.assertEqual(roberts["name"], "John G. Roberts, Jr.")
+        self.assertTournamentHasNumJudges(1)
+
+    def test_can_add_multiple_judges(self):
+        self.add_judge_to_tournament("John G. Roberts, Jr.")
+        self.add_judge_to_tournament("Michael Avenatti")  # Do they have Zoom in prison?
+        self.assertTournamentHasNumJudges(2)
+
+    def test_get_judge_works(self):
+        roberts = self.add_judge_to_tournament("John G. Roberts, Jr.")
+        roberts_id = roberts["id"]
+
+        found_info = self.get_judge_info(roberts["id"])
+        self.assertEqual(found_info["name"], "John G. Roberts, Jr.")
+
+    def test_add_judge_conflict(self):
+        roberts = self.add_judge_to_tournament("John G. Roberts, Jr.")
+        self.add_judge_conflict(roberts["id"], "Midlands University")
+        self.assertJudgeHasConflict(roberts["id"], "Midlands University")
+
+    def test_can_assign_ballot(self):
+        matchup_id = self.add_one_matchup_setup()
+        judge_id = self.add_judge_to_tournament("John G. Roberts, Jr.")['id']
+
+        new_ballot = self.assign_ballot(matchup_id, judge_id)
+
+        self.assertEqual(
+            judge_id, new_ballot["judge"], "judge_id does not match true judge_id"
+        )
+        self.assertEqual(
+            matchup_id, new_ballot["matchup"], "judge_id does not match true judge_id"
+        )
+
+    def test_assigned_ballot_appears_in_graph(self):
+        matchup_id, judge_id, new_ballot = self.add_one_matchup_w_judge()
+
+        self.assertJudgeHasBallot(judge_id, new_ballot)
+        self.assertMatchupHasBallot(matchup_id, new_ballot)
+
+class TestStudents(TestGraphQLServerBase):
+    def test_teams_start_with_no_students(self):
+        self.create_midlands_a()
+        self.assertTeamHasNumStudents(1001, 0)
+
+    def test_can_add_students(self):
+        self.create_midlands_a()
+
+        result = self.add_student_to_team(1001, "Elizabeth Bayes")
+        self.assertEqual(result['student']['name'], "Elizabeth Bayes")
+
+        self.assertTeamHasStudent(1001, "Elizabeth Bayes")
+        self.assertTeamHasNumStudents(1001, 1)
+
+    @unittest.skipIf(True, "Throws an error that ruins debug")
+    def test_cannot_add_duplicate_student(self):
+        self.create_midlands_a()
+        self.add_student_to_team(1001, "Elizabeth Bayes")
+
+        with self.assertRaises(BaseException):
+            stuff = self.add_student_to_team(1001, "Elizabeth Bayes")
+
+    def test_can_assign_student_to_closer(self):
+        matchup = self.add_one_matchup_setup()
+        bayes_id = self.add_elizabeth_bayes()
+
+        assignment = self.assign_student_to_role(matchup, 1001, bayes_id, "CLOSER")
+
+        matchup_id = assignment["matchup"]["id"]
+        self.assertEqual(matchup, matchup_id, "matchup id is incorrect")
 
-    self.assertEqual(new_tournament['name'], "Test Tournament")
-
-  def test_starts_with_no_schools(self):
-    self.assertHasNumSchools(0)
-
-  def test_add_school(self):
-    new_school = self.add_school_to_tournament("Midlands University")
-    self.assertEqual(new_school['name'], "Midlands University")
-    self.assertHasNumSchools(1)
-
-  def test_add_multiple_schools(self):
-    self.add_school_to_tournament("Midlands University")
-    self.add_school_to_tournament("Midlands State University")
-    self.assertHasNumSchools(2)
+        student_id = assignment["student"]["id"]
+        self.assertEqual(student_id, bayes_id, "Student id is incorrect")
 
-  def test_starts_with_no_teams(self):
-    self.assertHasNumTeams(0)
+        role = assignment["role"]
+        self.assertEqual(role, "CLOSER")
 
-  def test_school_starts_with_no_teams(self):
-    self.add_school_to_tournament("Midlands University")
-    self.assertSchoolHasNumTeams("Midlands University", 0)
+        self.assertStudentHasRole(bayes_id, "CLOSER", matchup, "PL")
 
-  def test_add_team(self, school="Midlands University", team="Midlands University A", num=1001):
-    self.add_school_to_tournament("Midlands University")
-    new_team = self.add_team_to_tournament(num, school, team)
+    def test_can_assign_full_lineup(self):
+        matchup = self.add_one_matchup_setup()
+        students = self.add_num_students_to_team(3, 1001)
 
-    self.assertEqual(new_team['num'], num)
-    self.assertEqual(new_team['name'], team)
-    self.assertEqual(new_team['schoolName'], school)
-    self.assertEqual(new_team['tournamentId'], self.tourn_id)
+        roles = ["OPENER", "MIDDLE", "CLOSER"]
+        for student, role in zip(students, roles):
+            self.assign_student_to_role(matchup, 1001, student, role)
 
-    self.assertSchoolHasNumTeams(school, 1)
-    self.assertSchoolContainsTeam(school, num, team)
+        for student, role in zip(students, roles):
+            self.assertStudentHasRole(student, role, matchup, "PL")
 
-  def test_add_multiple_teams(self):
-    self.add_school_to_tournament("Midlands University")
-    self.add_school_to_tournament("Midlands State University")
-    self.add_team_to_tournament(1001, "Midlands University", "Midlands University A")
-    self.assertHasNumTeams(1)
+    def test_can_assign_student_to_w1(self):
+        matchup = self.add_one_matchup_setup()
+        bayes_id = self.add_elizabeth_bayes()
 
-    self.add_team_to_tournament(1101, "Midlands State University", "Midlands State University A")
-    self.assertHasNumTeams(2)
+        assignment = self.assign_witness_to_order(matchup, "PL", bayes_id, 1)
 
-  def test_school_starts_without_team(self):
-    self.test_add_school()
-    with self.assertRaises(AssertionError):
-      self.assertSchoolContainsTeam("Midlands University", 1001, "Midlands University A")
+        self.assertEqual(assignment["matchup"]["id"], matchup)
+        self.assertEqual(assignment["student"]["id"], bayes_id)
+        self.assertEqual(assignment["order"], 1)
+        
+        self.assertWitnessGoesInOrder(bayes_id, 1, matchup, "PL")
 
-  def test_school_has_teams_after_add(self):
-    self.add_school_to_tournament("Midlands University")
-    self.add_team_to_tournament(1001, "Midlands University", "Midlands University A")
-    self.assertSchoolContainsTeam("Midlands University", 1001, "Midlands University A")
+    def test_can_assign_full_witness_lineup(self):
+        matchup = self.add_one_matchup_setup()
+        students = self.add_num_students_to_team(3, 1001)
+        orders = range(1, 4)
 
-  def test_tournament_starts_with_no_judges(self):
-    self.assertTournamentHasNumJudges(0)
+        for order, student in zip(orders, students):
+            self.assign_witness_to_order(matchup, "PL", student, order)
 
-  def test_can_add_judge(self):
-    roberts = self.add_judge_to_tournament("John G. Roberts, Jr.")
-    self.assertStringIsInt(roberts['id'])
-    self.assertEqual(roberts['name'], "John G. Roberts, Jr.")
-    self.assertTournamentHasNumJudges(1)
+        for order, student in zip(orders, students):
+            self.assertWitnessGoesInOrder(student, order, matchup, "PL")
 
-  def test_can_add_multiple_judges(self):
-    self.add_judge_to_tournament("John G. Roberts, Jr.")
-    self.add_judge_to_tournament("Michael Avenatti") # Do they have Zoom in prison?
-    self.assertTournamentHasNumJudges(2)
+    def test_can_assign_attorney_to_direct_witness(self):
+        matchup = self.add_one_matchup_setup()
+        bayes_id = self.add_elizabeth_bayes()
+            
+        assignment = self.assign_attorney_to_order(matchup, "PL", bayes_id, 1)
 
-  def test_get_judge_works(self):
-    roberts = self.add_judge_to_tournament("John G. Roberts, Jr.")
-    roberts_id = roberts['id']
+        self.assertEqual(assignment['matchup']['id'], matchup)
+        self.assertEqual(assignment['student']['id'], bayes_id)
+        self.assertEqual(assignment['order'], 1)
 
-    found_info = self.get_judge_info(roberts['id'])
-    self.assertEqual(found_info['name'], "John G. Roberts, Jr.")
+        self.assertAttorneyDirectsInOrder(bayes_id, 1, matchup, "PL")
 
-  def test_add_judge_conflict(self):
-    roberts = self.add_judge_to_tournament("John G. Roberts, Jr.")
-    self.add_judge_conflict(roberts['id'], "Midlands University")
-    self.assertJudgeHasConflict(roberts['id'], "Midlands University")
+    def test_can_assign_all_attorney_directs(self):
+        matchup = self.add_one_matchup_setup()
+        students = self.add_num_students_to_team(3, 1001)
 
-  def test_starts_with_no_rounds(self):
-    self.assertHasNumRounds(0)
+        for order, student in enumerate(students):
+            self.assign_attorney_to_order(matchup, "PL", student, order)
 
-  def test_can_add_manual_round(self):
-    self.add_default_team_matrix()
-    matchups = self.add_round(1, [{"pl": 1001, "def": 1101}, {"pl": 1002, "def": 1102}])
-    self.assertHasNumRounds(1)
-    self.assertHasMatchup(matchups[0], 1001, 1101)
-    self.assertHasMatchup(matchups[1], 1002, 1102)
+        for order, student in enumerate(students):
+            self.assertAttorneyDirectsInOrder(student, order, matchup, "PL")
 
-  def test_can_assign_ballot(self):
-    matchups = self.add_default_r1_setup()
-    judges = self.add_default_judges()
+    def test_can_assign_cross_examination(self):
+        matchup = self.add_one_matchup_setup()
+        student, = self.add_num_students_to_team(1, 1101)
 
-    matchup_id = matchups[0]
-    judge_id = judges[0]['id']
+        assignment = self.assign_cross(matchup, "PL", student, 1)
 
-    new_ballot = self.assign_ballot(matchup_id, judge_id)
+        self.assertEqual(assignment['matchup']['id'], matchup)
+        self.assertEqual(assignment['student']['id'], student)
+        self.assertEqual(assignment['team']['num'], 1101)
+        self.assertEqual(assignment['order'], 1)
 
-    self.assertEqual(judge_id, new_ballot['judge'], "judge_id does not match true judge_id")
-    self.assertEqual(matchup_id, new_ballot['matchup'], "judge_id does not match true judge_id")
-    
-  def test_assigned_ballot_appears_in_graph(self):
-    matchups = self.add_default_r1_setup()
-    judges = self.add_default_judges()
+        self.assertAttorneyIsCrossingWitness(student, 1, "PL", matchup)
 
-    matchup_id = matchups[0]
-    judge_id = judges[0]['id']
+    def test_can_assign_all_crosses(self):
+        matchup = self.add_one_matchup_setup()
+        students = self.add_num_students_to_team(3, 1101)
 
-    new_ballot = self.assign_ballot(matchup_id, judge_id)
+        for order, attorney in enumerate(students):
+            self.assign_cross(matchup, "PL", attorney, order)
 
-    self.assertJudgeHasBallot(judge_id, new_ballot['id'])
-    self.assertMatchupHasBallot(matchup_id, new_ballot['id'])
+        for order, attorney in enumerate(students):
+            self.assertAttorneyIsCrossingWitness(attorney, order, "PL", matchup)
 
-  def test_teams_start_with_no_students(self):
-    self.create_midlands_a()
-    self.assertTeamHasNumStudents(1001, 0)
+    def test_can_assign_witness_name(self):
+        matchup = self.add_one_matchup_setup()
 
-  def test_can_add_students(self):
-    self.create_midlands_a()
+        assignment = self.assign_witness_name(matchup, "PL", 1, "Danny Kosack")
 
-    new_team = self.add_student_to_team(1001, "Elizabeth Bayes")
-    new_students = [student['name'] for student in new_team['students']]
+        self.assertEqual(assignment['matchup']['id'], matchup)
+        self.assertEqual(assignment['witnessName'], "Danny Kosack")
 
-    self.assertIn("Elizabeth Bayes", new_students, "New student not returned from addStudent mutation")
-    self.assertTeamHasStudent(1001, "Elizabeth Bayes")
-    self.assertTeamHasNumStudents(1001, 1)
+        self.assertHasWitnessName("Danny Kosack", matchup, "PL", 1)
 
-  @unittest.skipIf(True, "Throws an error that ruins debug")
-  def test_cannot_add_duplicate_student(self):
-    self.create_midlands_a()
-    self.add_student_to_team(1001, "Elizabeth Bayes")
+    def test_can_assign_full_call_order(self):
+        matchup = self.add_one_matchup_setup()
 
-    with self.assertRaises(BaseException):
-      stuff = self.add_student_to_team(1001, "Elizabeth Bayes")
+        lineup = ["Kelly Doos", "Dr. Ron Quincy", "Kai Washington"]
 
-  def test_can_assign_student_to_closer(self):
-    matchup_ids = self.add_default_r1_setup()
-    bayes_id = self.add_elizabeth_bayes()
+        for order, witness in enumerate(lineup):
+            self.assign_witness_name(matchup, "PL", order, witness)
 
-    matchup = matchup_ids[0]
+        for order, witness in enumerate(lineup):
+            self.assertHasWitnessName(witness, matchup, "PL", order)
 
-    assignment = self.assign_student_to_role(matchup, 1001, bayes_id, "CLOSER")
+    def test_can_create_case_in_chief(self):
+        matchup = self.add_one_matchup_setup()
+        students = self.add_num_students_to_team(6, 1001)
+        crossers = self.add_num_students_to_team(3, 1101)
+        lineup = ["Kelly Doos", "Dr. R. Quincy", "Kai Washington"]
 
-    matchup_id = assignment['matchup']['id']
-    self.assertEqual(matchup, matchup_id, "matchup id is incorrect")
-    
-    student_id = assignment['student']['id']
-    self.assertEqual(student_id, bayes_id, "Student id is incorrect")
+        attorneys = students[:3]
+        witnesses = students[3:]
 
-    role = assignment['role']
-    self.assertEqual(role, "CLOSER")
+        for order, (witness, attorney, crosser, name) in enumerate(zip(witnesses, attorneys, crossers, lineup)):
+            self.assign_witness_to_order(matchup, "PL", witness, order)
+            self.assign_attorney_to_order(matchup, "PL", attorney, order)
+            self.assign_cross(matchup, "PL", crosser, order)
+            self.assign_witness_name(matchup, "PL", order, name)
 
-    self.assertStudentHasRole(bayes_id, "CLOSER", matchup, "pl")
+        for order, (witness, attorney, crosser, name) in enumerate(zip(witnesses, attorneys, crossers, lineup)):
+            self.assertWitnessGoesInOrder(witness, order, matchup, "PL")
+            self.assertAttorneyDirectsInOrder(attorney, order, matchup, "PL")
+            self.assertAttorneyIsCrossingWitness(crosser, order, "PL", matchup)
+            self.assertHasWitnessName(name, matchup, "PL", order)
 
-  def test_can_assign_student_to_opener(self):
-    matchups_ids = self.add_default_r1_setup()
-    bayes_id = self.add_elizabeth_bayes()
+class TestScoring(TestGraphQLServerBase):
+    def test_can_score_and_modify_opening(self):
+        _, judge, ballot = self.add_one_matchup_w_judge()
 
-    matchup = matchups_ids[0]
+        score = self.assign_speech_score(ballot, "PL", "OPENING", 10)
+        self.assertEqual(score, 10)
+        self.assertSpeechHasScore(10, "OPENING", "PL", ballot)
 
-    self.assign_student_to_role(matchup, 1001, bayes_id, "OPENER")
+        score = self.assign_speech_score(ballot, "PL", "OPENING", 8)
+        self.assertEqual(score, 8)
+        self.assertSpeechHasScore(8, "OPENING", "PL", ballot)
 
-    self.assertStudentHasRole(bayes_id, "OPENER", matchup, "pl")
+    def test_can_score_and_modify_closing(self):
+        _, judge, ballot = self.add_one_matchup_w_judge()
 
-  def test_can_assign_student_to_middle(self):
-    matchups_ids = self.add_default_r1_setup()
-    bayes_id = self.add_elizabeth_bayes()
+        self.assign_speech_score(ballot, "PL", "CLOSING", 10)
+        self.assertSpeechHasScore(10, "CLOSING", "PL", ballot)
 
-    matchup = matchups_ids[0]
+        self.assign_speech_score(ballot, "PL", "CLOSING", 8)
+        self.assertSpeechHasScore(8, "CLOSING", "PL", ballot)
 
-    self.assign_student_to_role(matchup, 1001, bayes_id, "MIDDLE")
+    def test_can_score_atty_direct(self):
+        _, judge, ballot = self.add_one_matchup_w_judge()
 
-    self.assertStudentHasRole(bayes_id, "MIDDLE", matchup, "pl")
+        score = self.assign_exam_score(ballot, "PL", 1, False, False, 8)
 
-  def test_can_assign_student_to_w1(self):
-    matchup_ids = self.add_default_r1_setup()
-    bayes_id = self.add_elizabeth_bayes()
+        self.assertEqual(score, 8)
+        self.assertExamHasScore(8, False, False, 1, "PL", ballot)
 
-    matchup = matchup_ids[0]
+        self.assign_exam_score(ballot, "PL", 1, False, False, 10)
+        self.assertExamHasScore(10, False, False, 1, "PL", ballot)
 
-    result = schema.execute(f"""
-      mutation assignStudentWitnessOrder {{
-        assignStudent
-      }}
-    """)
+    def test_can_score_atty_cross(self):
+        _, judge, ballot = self.add_one_matchup_w_judge()
+
+        score = self.assign_exam_score(ballot, "PL", 1, False, True, 8)
+        self.assertExamHasScore(8, True, False, 1, "PL", ballot)
+
+    def test_can_sum_scores(self):
+        _, judge, ballot = self.add_one_matchup_w_judge()
+
+        self.assign_exam_score(ballot, "PL", 1, False, False, 10)
+        self.assertBallotSideHasSum(ballot, "PL", 10)
+
+    def test_sum_updates(self):
+        _, judge, ballot = self.add_one_matchup_w_judge()
+
+        self.assign_exam_score(ballot, "PL", 1, False, False, 10)
+        self.assertBallotSideHasSum(ballot, "PL", 10)
+
+        self.assign_exam_score(ballot, "PL", 1, False, False, 8)
+        self.assertBallotSideHasSum(ballot, "PL", 8)
+
+    def test_can_sum_speeches(self):
+        _, judge, ballot = self.add_one_matchup_w_judge()
+
+        self.assign_speech_score(ballot, "PL", "OPENING", 10)
+        self.assertBallotSideHasSum(ballot, "PL", 10)
+
+    def test_can_sum_exams_and_speeches(self):
+        _, judge, ballot = self.add_one_matchup_w_judge()
+
+        self.assign_speech_score(ballot, "PL", "OPENING", 6)
+        self.assign_exam_score(ballot, "PL", 1, False, False, 9)
+        self.assertBallotSideHasSum(ballot, "PL", 15)
+
+    def test_sums_sides_independently(self):
+        _, judge, ballot = self.add_one_matchup_w_judge()
+
+        self.assign_speech_score(ballot, "PL", "OPENING", 8)
+        self.assign_speech_score(ballot, "DEF", "OPENING", 9)
+
+        self.assertBallotSideHasSum(ballot, "PL", 8)
+        self.assertBallotSideHasSum(ballot, "DEF", 9)
+
+    def test_finds_pd(self):
+        _, judge, ballot = self.add_one_matchup_w_judge()
+
+        self.assign_speech_score(ballot, "PL", "OPENING", 8)
+        self.assign_speech_score(ballot, "DEF", "OPENING", 9)
+
+        self.assertBallotHasPD(ballot, "PL", -1)
+
+    def test_full_round_scoring(self):
+        _, judge, ballot = self.add_one_matchup_w_judge()
+
+        self.assign_speech_score(ballot, "PL", "OPENING", 8)
+        self.assign_speech_score(ballot, "DEF", "OPENING", 9)
+
+        self.assertBallotSideHasSum(ballot, "PL", 8)
+        self.assertBallotSideHasSum(ballot, "DEF", 9)
+
+        PL_WIT_DX = 9
+        PL_ATTY_DX = 8
+        PL_WIT_CX = 9
+        DEF_ATTY_CX = 7
+
+        pl_exam_sum = PL_WIT_DX + PL_ATTY_DX + PL_WIT_CX
+
+        for exam in range(1, 4):
+            with self.subTest(f"PL Exam {exam}"):
+                self.assign_exam_score(ballot, "PL", exam, True, False, PL_WIT_DX)
+                self.assign_exam_score(ballot, "PL", exam, False, False, PL_ATTY_DX)
+                self.assign_exam_score(ballot, "PL", exam, True, True, PL_WIT_CX)
+                self.assign_exam_score(ballot, "DEF", exam, False, True, DEF_ATTY_CX)
+
+                self.assertBallotSideHasSum(ballot, "PL", (pl_exam_sum * exam) + 8)
+                self.assertBallotSideHasSum(ballot, "DEF", (DEF_ATTY_CX * exam) + 9)
+
+        pl_recess_score = 8 + (pl_exam_sum * 3)
+        def_recess_score = 9 + (DEF_ATTY_CX * 3)
+
+        self.assertBallotSideHasSum(ballot, "PL", pl_recess_score)
+        self.assertBallotSideHasSum(ballot, "DEF", def_recess_score)
+        self.assertBallotHasPD(ballot, "PL", pl_recess_score - def_recess_score)
+
+        DEF_WIT_DX = 8
+        DEF_WIT_CX = 7
+        DEF_ATTY_DX = 9
+        PL_ATTY_CX = 10
+
+        def_exam_sum = DEF_WIT_DX + DEF_ATTY_DX + DEF_WIT_CX
+
+        for exam in range(1, 4):
+            with self.subTest(f"DEF Exam {exam}"):
+                self.assign_exam_score(ballot, "DEF", exam, True, False, DEF_WIT_DX)
+                self.assign_exam_score(ballot, "DEF", exam, False, False, DEF_ATTY_DX)
+                self.assign_exam_score(ballot, "DEF", exam, True, True, DEF_WIT_CX)
+                self.assign_exam_score(ballot, "PL", exam, False, True, PL_ATTY_CX)
+
+                self.assertBallotSideHasSum(ballot, "PL", pl_recess_score + (exam * PL_ATTY_CX))
+                self.assertBallotSideHasSum(ballot, "DEF", def_recess_score + (exam * def_exam_sum))
+
+        pl_pre_closing_score = pl_recess_score + (3 * PL_ATTY_CX)
+        def_pre_closing_score = def_recess_score + (3 * def_exam_sum)
+
+        self.assertBallotSideHasSum(ballot, "PL", pl_pre_closing_score)
+        self.assertBallotSideHasSum(ballot, "DEF", def_pre_closing_score)
+        self.assertBallotHasPD(ballot, "PL", pl_pre_closing_score - def_pre_closing_score)
+
+        self.assertBallotIsDone(ballot, False)
+
+        self.assign_speech_score(ballot, "PL", "CLOSING", 9)
+        self.assign_speech_score(ballot, "DEF", "CLOSING", 10)
+
+        expected_pd = (pl_pre_closing_score - def_pre_closing_score) - 1
+
+        self.assertBallotHasPD(ballot, "PL", expected_pd)
+
+        self.assertBallotIsDone(ballot, True)

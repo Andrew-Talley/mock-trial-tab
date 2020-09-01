@@ -264,5 +264,15 @@ class TestResolvesImpermissibles(unittest.TestCase, InSameRoundAssertion):
     self.assertPairingExists(1, 4, enforce_sides=True)
     self.assertPairingExists(3, 5, enforce_sides=True)
 
+  def test_throws_error_on_impossible_pairing(self):
+    teams = [
+      get_team(1, past_pairings=[2], wins=2),
+      get_team(2, past_pairings=[1])
+    ]
+    matchups = [{"p": 1, "d": 2}]
+
+    with self.assertRaises(Exception):
+      resolve_impermissibles(matchups, teams, 2)
+
 if __name__ == "__main__":
     unittest.main()

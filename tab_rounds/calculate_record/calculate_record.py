@@ -11,9 +11,9 @@ class Result(Enum):
 def adj_ballots_for_round(elem, iter):
   ballots = list(iter)
   result_count = sum(1 if item == elem else 0 for item in ballots)
-  num_ballots = len(list(ballots))
+  num_ballots = len(ballots)
 
-  if (num_ballots == 0):
+  if num_ballots == 0:
     return 0
 
   return Fraction(2 * result_count, num_ballots)

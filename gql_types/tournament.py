@@ -2,7 +2,7 @@ import graphene
 
 from models import Tournament as SQLTournament, Judge as SQLJudge, Team as SQLTeam
 
-from gql_types.main_types import School, Team, Judge, Matchup
+from gql_types.main_types import School, Team, Judge, Matchup, Ballot
 from gql_types.round import Round
 
 
@@ -90,3 +90,11 @@ class Tournament(graphene.ObjectType):
     @staticmethod
     def resolve_matchup(parent, info, id):
         return Matchup(id=id)
+
+    ballot = graphene.Field(
+        Ballot, args={"id": graphene.ID(required=True)}, required=True
+    )
+
+    @staticmethod
+    def resolve_ballot(parent, info, id):
+        return Ballot(id=id)

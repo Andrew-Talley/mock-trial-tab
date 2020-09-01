@@ -15,3 +15,12 @@ class Student:
         db.commit()
 
         return cursor.lastrowid
+
+    @staticmethod
+    def get_student(student_id):
+        cursor = db.cursor()
+        cursor.execute(
+            f"SELECT student_name FROM {student_table} WHERE id = %s", (student_id,)
+        )
+
+        return {"name": cursor.fetchone()[0]}

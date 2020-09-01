@@ -1,6 +1,7 @@
 from models.connection import db, tables
 
 ballot_table = tables["ballot"]
+ballot_info = tables["ballot_info"]
 
 
 class Ballot:
@@ -15,3 +16,14 @@ class Ballot:
         db.commit()
 
         return cursor.lastrowid
+
+    @staticmethod
+    def get_is_complete(ballot_id):
+        cursor = db.cursor()
+        cursor.execute(
+            f"SELECT complete FROM {ballot_info} WHERE id = %s", (ballot_id,)
+        )
+
+        (complete,) = cursor.fetchone()
+
+        return complete

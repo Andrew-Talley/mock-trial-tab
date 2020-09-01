@@ -1,7 +1,7 @@
 import graphene
 
 import models
-from gql_types import Role, Matchup, Student
+from gql_types import AttorneyRole, Matchup, Student
 
 
 class AssignStudentToRole(graphene.Mutation):
@@ -10,11 +10,11 @@ class AssignStudentToRole(graphene.Mutation):
         team = graphene.Int(required=True)
         matchup = graphene.ID(required=True)
         student = graphene.ID(required=True)
-        role = graphene.Argument(Role, required=True)
+        role = graphene.Argument(AttorneyRole, required=True)
 
     matchup = graphene.Field(Matchup, required=True)
     student = graphene.Field(Student, required=True)
-    role = graphene.Field(Role, required=True)
+    role = graphene.Field(AttorneyRole, required=True)
 
     @staticmethod
     def mutate(parent, info, tournament_id, team, matchup, student, role):

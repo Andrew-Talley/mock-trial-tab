@@ -1,12 +1,21 @@
-import mysql.connector
+import mysql.connector.pooling
+import os
 
-db = mysql.connector.connect(
-    host="localhost",
-    port="8889",
-    username="root",
-    password="root",
-    database="mock_trial_db",
-)
+from dotenv import load_dotenv
+
+load_dotenv()
+
+db_config = {
+    "host": os.environ.get('host'),
+    "port": os.environ.get('port'),
+    "username": os.environ.get('username'),
+    "password": os.environ.get('password'),
+    "database": os.environ.get('database'),
+}
+
+def get_cnx():
+    return mysql.connector.connect(**db_config)
+
 
 tables = {
     "tournament": "Tournament",
@@ -15,6 +24,7 @@ tables = {
     "judge": "Judge",
     "conflict": "JudgeConflict",
     "matchup": "Matchup",
+    "full_matchup": "FullMatchupData",
     "side": "MatchupSide",
     "ballot": "Ballot",
     "student": "Student",
@@ -27,4 +37,5 @@ tables = {
     "exam_data": "ExamData",
     "ballot_side_sum": "BallotSideSum",
     "ballot_info": "BallotInfo",
+    "ballot_matchup_info": "BallotMatchupView",
 }

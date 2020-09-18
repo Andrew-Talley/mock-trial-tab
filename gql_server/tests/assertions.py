@@ -148,7 +148,7 @@ class GraphQLTestCase(unittest.TestCase):
                 tournament(id: {self.tourn_id}) {{
                     judge(id: {judge_id}) {{
                         conflicts {{
-                        name
+                            name
                         }}
                     }}
                 }}
@@ -160,6 +160,24 @@ class GraphQLTestCase(unittest.TestCase):
         self.assertTrue(
             any(conflict["name"] == school for conflict in conflicts),
             f"School {school} not found in conflicts for judge {judge_id}",
+        )
+
+    def assertJudgeIsListed(self, judge_id):
+        result = schema.execute(
+            f"""
+            query judgeList {{
+                tournament(id: {self.tourn_id}) {{
+                    judges {{
+                        id
+                    }}
+                }}
+            }}
+            """
+        )
+
+        judges = result.data['tournament']['judges']
+        self.assertTrue(
+            any(judge['id'] == judge_id for judge in judges), f"Judge {judge_id} not found in {self.tourn_id}"
         )
 
     def assertHasNumRounds(self, num_rounds):
@@ -183,6 +201,23 @@ class GraphQLTestCase(unittest.TestCase):
             true_num_rounds,
             expected_len("round", num_rounds, true_num_rounds),
         )
+
+    def assertHasRound(self, round_num):
+        result = schema.execute(
+            f"""
+            query roundInTournament {{
+                tournament(id: {self.tourn_id}) {{
+                    round(num: {round_num}) {{
+                        roundNum
+                    }}
+                }}
+            }}
+            """
+        )
+
+        found_round = result.data['tournament']['round']
+
+        self.assertEqual(found_round['roundNum'], round_num)
 
     def assertJudgeHasBallot(self, judge_id, ballot_id):
         result = schema.execute(
@@ -502,3 +537,24 @@ class GraphQLTestCase(unittest.TestCase):
         is_complete = result.data['tournament']['ballot']['complete']
         
         self.assertEqual(done, is_complete)
+
+    def assertTeamHasRecord(self, team_num, wins, losses, ties):
+        result = schema.execute(
+            f"""
+            query record {{
+                tournament(id: {self.tourn_id}) {{
+                    team(num: {team_num}) {{
+                        wins
+                        losses
+                        ties
+                    }}
+                }}
+            }}
+            """
+        )
+
+        record = result.data['tournament']['team']
+
+        self.assertEqual(wins, record['wins'])
+        self.assertEqual(losses, record['losses'])
+        self.assertEqual(ties, record['ties'])

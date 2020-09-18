@@ -1,10 +1,13 @@
 from __future__ import annotations
+from typing import Tuple, Optional
+
 import graphene
 from graphene import NonNull
 
 import models
 
 from gql_types.enums import Role, AttorneyRole, Side, Speech, ExamType
+from tab_rounds.calculate_record.calculate_record import calculate_record, Result
 
 
 class School(graphene.ObjectType):
@@ -26,7 +29,9 @@ class Team(graphene.ObjectType):
     name = graphene.String(required=True)
 
     def resolve_name(parent, info):
-        return parent.name
+        if parent.name is not None:
+            return parent.name
+        return models.Team.get_team(parent.tournament_id, parent.num)["name"]
 
     num = graphene.Int(required=True)
 
@@ -37,10 +42,74 @@ class Team(graphene.ObjectType):
 
     students = NonNull(graphene.List(lambda: Student, required=True))
 
+    matchups = NonNull(graphene.List(lambda: Matchup, required=True))
+
     @staticmethod
     def resolve_students(parent, info):
         students = models.Team.get_students(parent.tournament_id, parent.num)
         return [Student(id=student["id"], name=student["name"]) for student in students]
+
+    @staticmethod
+    def resolve_matchups(parent, info):
+        matchup_ids = models.Team.get_matchups(parent.tournament_id, parent.num)
+        return [Matchup(id=matchup) for matchup in matchup_ids]
+
+    """
+    RECORD INFORMATION
+    """
+    record: Optional[Tuple[int, int, int]] = None
+
+    @staticmethod
+    def get_record(parent, info):
+        if parent.record is None:
+            matchups = Team.resolve_matchups(parent, info)
+            sides = [
+                "pl"
+                if Matchup.resolve_pl(matchup, info).team_num == parent.num
+                else "def"
+                for matchup in matchups
+            ]
+            ballots = [Matchup.resolve_ballots(matchup, info) for matchup in matchups]
+            pds = [
+                [Ballot.resolve_pd(ballot, info, side) for ballot in round_ballots]
+                for round_ballots, side in zip(ballots, sides)
+            ]
+            results = [
+                [
+                    Result.WIN if pd > 0 else Result.TIE if pd == 0 else Result.LOSS
+                    for pd in round_pds if pd is not None
+                ]
+                for round_pds in pds
+            ]
+            parent.record = calculate_record(results)
+
+        return parent.record
+
+    wins = graphene.Int(required=True)
+
+    @staticmethod
+    def resolve_wins(parent, info):
+        record = Team.get_record(parent, info)
+        try:
+            return record["wins"]
+        except TypeError:
+            print("Failed...")
+            print(Team.get_record(parent, info))
+            raise Exception("Uh oh...")
+
+    losses = graphene.Int(required=True)
+
+    @staticmethod
+    def resolve_losses(parent, info):
+        record = Team.get_record(parent, info)
+        return record["losses"]
+
+    ties = graphene.Int(required=True)
+
+    @staticmethod
+    def resolve_ties(parent, info):
+        record = Team.get_record(parent, info)
+        return record["ties"]
 
 
 class Student(graphene.ObjectType):
@@ -70,15 +139,19 @@ class BallotSide(graphene.ObjectType):
 
     @staticmethod
     def resolve_speech(parent, info, speech):
-        return models.Scores.get_speech_score(parent._ballot.id, parent.side, speech)[
-            "score"
-        ]
+        speech = models.Scores.get_speech_score(parent._ballot.id, parent.side, speech)
+        if speech is None:
+            return None
+        return speech["score"]
 
     @staticmethod
     def resolve_exam(parent, info, order, role, exam_type):
-        return models.Scores.get_exam_score(
+        exam = models.Scores.get_exam_score(
             parent._ballot.id, parent.side, order, role, exam_type
-        )["score"]
+        )
+        if exam is None:
+            return None
+        return exam["score"]
 
     @staticmethod
     def resolve_side_sum(parent, info):
@@ -95,7 +168,7 @@ class Ballot(graphene.ObjectType):
     )
 
     pd = graphene.Int(
-        required=True, args={"side": graphene.Argument(Side, required=True)}
+        args={"side": graphene.Argument(Side, required=True)}
     )
 
     complete = graphene.Boolean(required=True)
@@ -111,6 +184,9 @@ class Ballot(graphene.ObjectType):
         pl_sum = models.Scores.get_sum(parent.id, Side.PL)
         def_sum = models.Scores.get_sum(parent.id, Side.DEF)
 
+        if pl_sum is None or def_sum is None:
+            return None
+
         pl_pd = pl_sum - def_sum
 
         if side == Side.PL:
@@ -122,6 +198,13 @@ class Ballot(graphene.ObjectType):
     def resolve_complete(parent, info):
         return models.Ballot.get_is_complete(parent.id)
 
+    @staticmethod
+    def resolve_judge(parent, info):
+        return Judge(models.Ballot.get_judge_for_ballot(parent.id))
+
+    @staticmethod
+    def resolve_matchup(parent, info):
+        return Matchup(id=models.Ballot.get_matchup_for_ballot(parent.id))
 
 class MatchupWitness(graphene.ObjectType):
     matchup_team = graphene.Field(lambda: MatchupTeam, required=True)
@@ -157,7 +240,7 @@ class MatchupTeam(graphene.ObjectType):
 
     @staticmethod
     def resolve_team(parent, info):
-        return Team(num=parent.team_num)
+        return Team(num=parent.team_num, tournament_id=parent.tournament_id)
 
     student_in_role = graphene.Field(
         Student, args={"role": graphene.Argument(AttorneyRole, required=True)}
@@ -231,6 +314,13 @@ class Matchup(graphene.ObjectType):
         t_id, d_id = match.get("tournament_id"), match.get("def")
         return MatchupTeam(team_num=d_id, tournament_id=t_id, matchup_id=parent.id)
 
+    round_num = graphene.Int(required=True)
+
+    @staticmethod
+    def resolve_round_num(parent, info):
+        match = models.Matchup.get_matchup(parent.id)
+        return match["round_num"]
+
     team = graphene.Field(
         MatchupTeam,
         required=True,
@@ -260,6 +350,10 @@ class Judge(graphene.ObjectType):
     tournament_id = graphene.ID(required=True)
 
     ballots = graphene.List(Ballot, required=True)
+
+    @staticmethod
+    def resolve_name(parent, info):
+        return models.Judge.get_judge(parent.tournament_id, parent.id)["name"]
 
     @staticmethod
     def resolve_ballots(parent, info):

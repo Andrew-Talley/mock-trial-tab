@@ -1,5 +1,8 @@
 import sys
 import unittest
+
+from itertools import chain, repeat
+
 from gql_server.schema import schema
 from models.tournament import Tournament
 
@@ -89,6 +92,7 @@ class TestGraphQLServerBase(GraphQLTestCase):
             query getJudge {{
                 tournament(id: {self.tourn_id}) {{
                     judge(id: {judge_id}) {{
+                        id
                         name
                     }}
                 }}
@@ -104,7 +108,7 @@ class TestGraphQLServerBase(GraphQLTestCase):
         result = schema.execute(
             f"""
             mutation addConflict {{
-                addJudgeConflict(tournamentId: {self.tourn_id}, judgeId: "{judge_id}", school: "{school}") {{
+                addJudgeConflict(tournamentId: {self.tourn_id}, judgeId: {judge_id}, school: "{school}") {{
                     id
                 }}
             }}
@@ -179,14 +183,14 @@ class TestGraphQLServerBase(GraphQLTestCase):
         result = schema.execute(
             f"""
             mutation assignBallot {{
-                assignJudgeToMatchup(matchup: {matchup_id}, judge: {judge_id}) {{
-                id
-                judge {{
+                assignJudgeToMatchup(tournament: {self.tourn_id}, matchup: {matchup_id}, judge: {judge_id}) {{
                     id
-                }}
-                matchup {{
-                    id
-                }}
+                    judge {{
+                        id
+                    }}
+                    matchup {{
+                        id
+                    }}
                 }}
             }}
             """
@@ -379,11 +383,14 @@ class TestGraphQLServerBase(GraphQLTestCase):
 
         return [roberts, avenatti]
 
+    def _speech_assignment(self, ballot, side, speech, score):
+        return f"assignSpeechScore(ballot: {ballot}, side: {side}, speech: {speech}, score: {score})"
+
     def assign_speech_score(self, ballot, side, speech, score):
         result = schema.execute(
             f"""
             mutation openingScore {{
-                assignSpeechScore(ballot: {ballot}, side: {side}, speech: {speech}, score: {score})
+                {self._speech_assignment(ballot, side, speech, score)}
             }}
             """
         )
@@ -392,11 +399,14 @@ class TestGraphQLServerBase(GraphQLTestCase):
 
         return score
 
+    def _exam_assignment(self, ballot, side, exam, witness, cross, score):
+        return f"assignExamScore(ballot: {ballot}, side: {side}, exam: {exam}, witness: {self._to_GQL_bool(witness)}, cross: {self._to_GQL_bool(cross)}, score: {score})"
+
     def assign_exam_score(self, ballot, side, exam, witness, cross, score):
         result = schema.execute(
             f"""
                 mutation addWitnessScore {{
-                    assignExamScore(ballot: {ballot}, side: {side}, exam: {exam}, witness: {self._to_GQL_bool(witness)}, cross: {self._to_GQL_bool(cross)}, score: {score})
+                    {self._exam_assignment(ballot, side, exam, witness, cross, score)}
                 }}
             """
         )
@@ -404,7 +414,50 @@ class TestGraphQLServerBase(GraphQLTestCase):
         return result.data['assignExamScore']
 
     def assign_full_round(self, ballot, pd):
-        return
+        pl_scores = chain(repeat(10, pd), repeat(9))
+        def_scores = repeat(9)
+
+        side_scores = {
+            "PL": pl_scores,
+            "DEF": def_scores
+        }
+
+        def speech_assignment(side, speech):
+            return self._speech_assignment(ballot, side, speech, next(side_scores[side]))
+
+        def exam_assignment(side, exam, witness, cross):
+            return self._exam_assignment(ballot, side, exam, witness, cross, next(side_scores[side]))
+        
+        def pl_full_exam(exam):
+            return f"""
+                wDir{exam}: {exam_assignment("PL", exam, True, False)}
+                aDir{exam}: {exam_assignment("PL", exam, False, False)}
+                wCr{exam}: {exam_assignment("PL", exam, True, True,)}
+                aCr{exam}: {exam_assignment("DEF", exam, False, True)}
+            """
+
+        def def_full_exam(exam):
+            return f"""
+                dWDir{exam}: {exam_assignment("DEF", exam, True, False,)}
+                dADir{exam}: {exam_assignment("DEF", exam, False, False)}
+                dWCr{exam}: {exam_assignment("DEF", exam, True, True)}
+                dACr{exam}: {exam_assignment("PL", exam, False, True)}
+            """
+
+        new_line = "\n"
+
+        schema.execute(
+            f"""
+            mutation fullRound {{
+                pOpen: {speech_assignment("PL", "OPENING")}
+                dOpen: {speech_assignment("DEF", "OPENING")}
+                {new_line.join(pl_full_exam(exam) for exam in range(1, 4))}
+                {new_line.join(def_full_exam(exam) for exam in range(1, 4))}
+                pClose: {speech_assignment("PL", "CLOSING")}
+                dClose: {speech_assignment("DEF", "CLOSING")}
+            }}
+            """
+        )
 
 class TestTournamentsTeamsAndSchools(TestGraphQLServerBase):
     def test_create_tournament(self):
@@ -482,6 +535,28 @@ class TestTournamentsTeamsAndSchools(TestGraphQLServerBase):
             "Midlands University", 1001, "Midlands University A"
         )
 
+    def test_get_team_name(self):
+        self.add_school_to_tournament("Midlands University")
+        self.add_team_to_tournament(
+            1001, "Midlands University", "Midlands University A"
+        )
+
+        result = schema.execute(
+            f"""
+            query getTeamName {{
+                tournament(id: {self.tourn_id}) {{
+                    team(num: {1001}) {{
+                        name
+                    }}
+                }}
+            }}
+            """
+        )
+
+        team_name = result.data['tournament']['team']['name']
+
+        self.assertEqual("Midlands University A", team_name)
+
 class TestMatchups(TestGraphQLServerBase):
     def test_starts_with_no_rounds(self):
         self.assertHasNumRounds(0)
@@ -492,8 +567,82 @@ class TestMatchups(TestGraphQLServerBase):
             1, [{"pl": 1001, "def": 1101}, {"pl": 1002, "def": 1102}]
         )
         self.assertHasNumRounds(1)
+        self.assertHasRound(1)
         self.assertHasMatchup(matchups[0], 1001, 1101)
         self.assertHasMatchup(matchups[1], 1002, 1102)
+
+    def test_team_has_matchup(self):
+        [matchup, _] = self.add_default_r1_setup()
+        result = schema.execute(
+            f"""
+            query teamMatchups {{
+                tournament(id: {self.tourn_id}) {{
+                    team(num: {1001}) {{
+                        matchups {{
+                            id
+                        }}
+                    }}
+                }}
+            }}
+            """
+        )
+
+        [gql_matchup] = result.data['tournament']['team']['matchups']
+
+        self.assertEqual(matchup, gql_matchup['id'])
+
+    def test_matchup_gives_round_num(self):
+        [matchup, _] = self.add_default_r1_setup()
+        result = schema.execute(
+            f"""
+            query teamMatchups {{
+                tournament(id: {self.tourn_id}) {{
+                    matchup(id: {matchup}) {{
+                        roundNum
+                    }}
+                }}
+            }}
+            """
+        )
+
+        round_num = result.data['tournament']['matchup']['roundNum']
+
+        self.assertEqual(round_num, 1)
+
+    def test_matchup_teams_are_fully_explorable(self):
+        [matchup, _] = self.add_default_r1_setup()
+        result = schema.execute(
+            f"""
+            query teamMatchups {{
+                tournament(id: {self.tourn_id}) {{
+                    matchup(id: {matchup}) {{
+                        pl {{
+                            team {{
+                                num
+                                name
+                            }}
+                        }}
+                        def {{
+                            team {{
+                                num
+                                name
+                            }}
+                        }}
+                    }}
+                }}
+            }}
+            """
+        )
+
+        match = result.data['tournament']['matchup']
+        pl = match['pl']['team']
+        self.assertEqual(pl['num'], 1001)
+        self.assertEqual(pl['name'], "Midlands University A")
+
+        de = match['def']['team']
+        self.assertEqual(de['num'], 1101)
+        self.assertEqual(de['name'], "Midlands State University A")
+
 
 class TestJudges(TestGraphQLServerBase):
     def test_tournament_starts_with_no_judges(self):
@@ -504,6 +653,7 @@ class TestJudges(TestGraphQLServerBase):
         self.assertStringIsInt(roberts["id"])
         self.assertEqual(roberts["name"], "John G. Roberts, Jr.")
         self.assertTournamentHasNumJudges(1)
+        self.assertJudgeIsListed(roberts["id"])
 
     def test_can_add_multiple_judges(self):
         self.add_judge_to_tournament("John G. Roberts, Jr.")
@@ -514,8 +664,9 @@ class TestJudges(TestGraphQLServerBase):
         roberts = self.add_judge_to_tournament("John G. Roberts, Jr.")
         roberts_id = roberts["id"]
 
-        found_info = self.get_judge_info(roberts["id"])
+        found_info = self.get_judge_info(roberts_id)
         self.assertEqual(found_info["name"], "John G. Roberts, Jr.")
+        self.assertEqual(found_info["id"], roberts_id)
 
     def test_add_judge_conflict(self):
         roberts = self.add_judge_to_tournament("John G. Roberts, Jr.")
@@ -534,6 +685,23 @@ class TestJudges(TestGraphQLServerBase):
         self.assertEqual(
             matchup_id, new_ballot["matchup"], "judge_id does not match true judge_id"
         )
+
+    # @unittest.skipIf(True, "Throws an error")
+    def test_cannot_assign_multiple_ballots(self):
+        [m1, m2] = self.add_default_r1_setup()
+        judge_id = self.add_judge_to_tournament("John G. Roberts, Jr.")['id']
+
+        new_ballot = self.assign_ballot(m1, judge_id)
+
+        result = schema.execute(f"""
+            mutation addDuplicateBallot {{
+                assignJudgeToMatchup(matchup: {m2}, judge: {judge_id}) {{
+                    id
+                }}
+            }}
+        """)
+
+        self.assertGreaterEqual(len(result.errors), 1)
 
     def test_assigned_ballot_appears_in_graph(self):
         matchup_id, judge_id, new_ballot = self.add_one_matchup_w_judge()
@@ -787,67 +955,56 @@ class TestScoring(TestGraphQLServerBase):
     def test_full_round_scoring(self):
         _, judge, ballot = self.add_one_matchup_w_judge()
 
-        self.assign_speech_score(ballot, "PL", "OPENING", 8)
-        self.assign_speech_score(ballot, "DEF", "OPENING", 9)
+        self.assign_full_round(ballot, 13)
 
-        self.assertBallotSideHasSum(ballot, "PL", 8)
-        self.assertBallotSideHasSum(ballot, "DEF", 9)
+        self.assertBallotHasPD(ballot, "PL", 13)
 
-        PL_WIT_DX = 9
-        PL_ATTY_DX = 8
-        PL_WIT_CX = 9
-        DEF_ATTY_CX = 7
-
-        pl_exam_sum = PL_WIT_DX + PL_ATTY_DX + PL_WIT_CX
-
-        for exam in range(1, 4):
-            with self.subTest(f"PL Exam {exam}"):
-                self.assign_exam_score(ballot, "PL", exam, True, False, PL_WIT_DX)
-                self.assign_exam_score(ballot, "PL", exam, False, False, PL_ATTY_DX)
-                self.assign_exam_score(ballot, "PL", exam, True, True, PL_WIT_CX)
-                self.assign_exam_score(ballot, "DEF", exam, False, True, DEF_ATTY_CX)
-
-                self.assertBallotSideHasSum(ballot, "PL", (pl_exam_sum * exam) + 8)
-                self.assertBallotSideHasSum(ballot, "DEF", (DEF_ATTY_CX * exam) + 9)
-
-        pl_recess_score = 8 + (pl_exam_sum * 3)
-        def_recess_score = 9 + (DEF_ATTY_CX * 3)
-
-        self.assertBallotSideHasSum(ballot, "PL", pl_recess_score)
-        self.assertBallotSideHasSum(ballot, "DEF", def_recess_score)
-        self.assertBallotHasPD(ballot, "PL", pl_recess_score - def_recess_score)
-
-        DEF_WIT_DX = 8
-        DEF_WIT_CX = 7
-        DEF_ATTY_DX = 9
-        PL_ATTY_CX = 10
-
-        def_exam_sum = DEF_WIT_DX + DEF_ATTY_DX + DEF_WIT_CX
-
-        for exam in range(1, 4):
-            with self.subTest(f"DEF Exam {exam}"):
-                self.assign_exam_score(ballot, "DEF", exam, True, False, DEF_WIT_DX)
-                self.assign_exam_score(ballot, "DEF", exam, False, False, DEF_ATTY_DX)
-                self.assign_exam_score(ballot, "DEF", exam, True, True, DEF_WIT_CX)
-                self.assign_exam_score(ballot, "PL", exam, False, True, PL_ATTY_CX)
-
-                self.assertBallotSideHasSum(ballot, "PL", pl_recess_score + (exam * PL_ATTY_CX))
-                self.assertBallotSideHasSum(ballot, "DEF", def_recess_score + (exam * def_exam_sum))
-
-        pl_pre_closing_score = pl_recess_score + (3 * PL_ATTY_CX)
-        def_pre_closing_score = def_recess_score + (3 * def_exam_sum)
-
-        self.assertBallotSideHasSum(ballot, "PL", pl_pre_closing_score)
-        self.assertBallotSideHasSum(ballot, "DEF", def_pre_closing_score)
-        self.assertBallotHasPD(ballot, "PL", pl_pre_closing_score - def_pre_closing_score)
+    def test_starts_uncompleted(self):
+        _, _, ballot = self.add_one_matchup_w_judge()
 
         self.assertBallotIsDone(ballot, False)
 
-        self.assign_speech_score(ballot, "PL", "CLOSING", 9)
-        self.assign_speech_score(ballot, "DEF", "CLOSING", 10)
+    def test_can_complete_round_after_score(self):
+        _, _, ballot = self.add_one_matchup_w_judge()
+        self.assign_full_round(ballot, 13)
 
-        expected_pd = (pl_pre_closing_score - def_pre_closing_score) - 1
+        self.assertBallotIsDone(ballot, False)
+        
+        result = schema.execute(f"""
+            mutation completeBallot {{
+                completeBallot(tournament: {self.tourn_id}, ballot: {ballot}) {{
+                    complete
+                }}
+            }}
+        """)
 
-        self.assertBallotHasPD(ballot, "PL", expected_pd)
 
-        self.assertBallotIsDone(ballot, True)
+        self.assertEqual(result.data['completeBallot']['complete'], True)
+
+        self.assertBallotIsDone(ballot)
+        
+
+class TestRecord(TestGraphQLServerBase):
+    def test_starts_with_empty_record(self):
+        self.create_midlands_a()
+
+        self.assertTeamHasRecord(1001, 0, 0, 0)
+
+    def test_has_two_wins_after_single_ballot_win(self):
+        _, judge, ballot = self.add_one_matchup_w_judge()
+        self.assign_full_round(ballot, 13)
+
+        self.assertTeamHasRecord(1001, 2, 0, 0)
+
+    def test_has_two_losses_after_single_ballot_loss(self):
+        _, judge, ballot = self.add_one_matchup_w_judge()
+        self.assign_full_round(ballot, 13)
+
+        self.assertTeamHasRecord(1101, 0, 2, 0)
+
+    def test_yields_ties_for_both_sides(self):
+        _, judge, ballot = self.add_one_matchup_w_judge()
+        self.assign_full_round(ballot, 0)
+
+        self.assertTeamHasRecord(1001, 0, 0, 2)
+        self.assertTeamHasRecord(1101, 0, 0, 2)

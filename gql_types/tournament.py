@@ -10,7 +10,11 @@ class Tournament(graphene.ObjectType):
     id = graphene.ID(required=True)
     name = graphene.String(required=True)
 
-    schools = graphene.List(School)
+    schools = graphene.List(graphene.NonNull(School), required=True)
+
+    @staticmethod
+    def resolve_name(parent, info):
+        return SQLTournament.get_all_info_for_tournament(parent.id)['name']
 
     @staticmethod
     def resolve_schools(parent, info):
@@ -21,7 +25,7 @@ class Tournament(graphene.ObjectType):
         ]
         return schools
 
-    teams = graphene.List(Team, required=True)
+    teams = graphene.List(graphene.NonNull(Team), required=True)
 
     @staticmethod
     def resolve_teams(parent, info):
@@ -72,7 +76,7 @@ class Tournament(graphene.ObjectType):
         judge = SQLJudge.get_judge(parent.id, id)
         return Judge(id=judge["id"], name=judge["name"], tournament_id=parent.id)
 
-    rounds = graphene.List(Round, required=True)
+    rounds = graphene.List(graphene.NonNull(Round), required=True)
 
     @staticmethod
     def resolve_rounds(parent, info):
@@ -80,6 +84,17 @@ class Tournament(graphene.ObjectType):
         return [
             Round(round_num=round_num, tournament_id=parent.id) for round_num in rounds
         ]
+
+    single_round = graphene.Field(
+        Round,
+        args={"num": graphene.Argument(graphene.Int, required=True)},
+        required=True,
+        name="round",
+    )
+
+    @staticmethod
+    def resolve_single_round(parent, info, num):
+        return Round(round_num=num, tournament_id=parent.id)
 
     matchup = graphene.Field(
         Matchup,

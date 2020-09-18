@@ -1,5 +1,5 @@
 from typing import Literal
-from models.connection import db, tables
+from models.connection import get_cnx, tables
 
 score_table = tables["scores"]
 speech_table = tables["speech"]
@@ -29,51 +29,54 @@ class Scores:
 
     @staticmethod
     def _add_single_score(ballot_id, side, score):
-        cursor = db.cursor()
-        sql_side = Scores._sql_pl(side)
-        cursor.execute(
-            f"""
-            INSERT INTO {score_table} (ballot_id, pl, score)
-                VALUES (%s, %s, %s)
-            """,
-            (ballot_id, sql_side, score),
-        )
+        with get_cnx() as db:
+            cursor = db.cursor()
+            sql_side = Scores._sql_pl(side)
+            cursor.execute(
+                f"""
+                INSERT INTO {score_table} (ballot_id, pl, score)
+                    VALUES (%s, %s, %s)
+                """,
+                (ballot_id, sql_side, score),
+            )
 
-        return cursor.lastrowid
+            return cursor.lastrowid
 
     @staticmethod
     def _add_speech_score(ballot_id, side, speech, score):
-        new_ballot_score = Scores._add_single_score(ballot_id, side, score)
+        with get_cnx() as db:
+            new_ballot_score = Scores._add_single_score(ballot_id, side, score)
 
-        cursor = db.cursor()
+            cursor = db.cursor()
 
-        sql_opening = Scores._sql_opening(speech)
-        cursor.execute(
-            f"""
-            INSERT INTO {speech_table} (ballot_score_id, opening)
-                VALUES (%s, %s)
-            """,
-            (new_ballot_score, sql_opening),
-        )
+            sql_opening = Scores._sql_opening(speech)
+            cursor.execute(
+                f"""
+                INSERT INTO {speech_table} (ballot_score_id, opening)
+                    VALUES (%s, %s)
+                """,
+                (new_ballot_score, sql_opening),
+            )
 
-        db.commit()
+            db.commit()
 
-        return new_ballot_score
+            return new_ballot_score
 
     @staticmethod
     def _update_speech_score(score_id, score):
-        cursor = db.cursor()
+        with get_cnx() as db:
+            cursor = db.cursor()
 
-        cursor.execute(
-            f"""
-                UPDATE {score_table}
-                    SET score = %s
-                WHERE id = %s
-            """,
-            (score, score_id),
-        )
+            cursor.execute(
+                f"""
+                    UPDATE {score_table}
+                        SET score = %s
+                    WHERE id = %s
+                """,
+                (score, score_id),
+            )
 
-        db.commit()
+            db.commit()
 
     @staticmethod
     def set_speech_score(
@@ -93,61 +96,64 @@ class Scores:
     def get_speech_score(
         ballot_id: int, side: Literal["pl", "def"], speech: Literal["open", "close"]
     ):
-        cursor = db.cursor()
-        sql_pl = Scores._sql_pl(side)
-        sql_opening = Scores._sql_opening(speech)
+        with get_cnx() as db:
+            cursor = db.cursor()
+            sql_pl = Scores._sql_pl(side)
+            sql_opening = Scores._sql_opening(speech)
 
-        cursor.execute(
-            f"""
-                SELECT score, id
-                    FROM {speech_data_table}
-                WHERE ballot_id = %s AND pl = %s AND opening = %s
-            """,
-            (ballot_id, sql_pl, sql_opening),
-        )
+            cursor.execute(
+                f"""
+                    SELECT score, id
+                        FROM {speech_data_table}
+                    WHERE ballot_id = %s AND pl = %s AND opening = %s
+                """,
+                (ballot_id, sql_pl, sql_opening),
+            )
 
-        result = cursor.fetchone()
+            result = cursor.fetchone()
 
-        if result is None:
-            return None
+            if result is None:
+                return None
 
-        score, score_id = result
+            score, score_id = result
 
-        return {"score": score, "id": score_id}
+            return {"score": score, "id": score_id}
 
     @staticmethod
     def _update_exam_score(score_id: int, new_score: int):
-        cursor = db.cursor()
+        with get_cnx() as db:
+            cursor = db.cursor()
 
-        cursor.execute(
-            f"""
-                UPDATE {score_table}
-                    SET score = %s
-                WHERE id = %s
-            """,
-            (new_score, score_id),
-        )
+            cursor.execute(
+                f"""
+                    UPDATE {score_table}
+                        SET score = %s
+                    WHERE id = %s
+                """,
+                (new_score, score_id),
+            )
 
     @staticmethod
     def _add_exam_score(ballot_id, side, exam_num, role, exam_type, score):
         new_score_id = Scores._add_single_score(ballot_id, side, score)
 
-        cursor = db.cursor()
+        with get_cnx() as db:
+            cursor = db.cursor()
 
-        sql_attorney = Scores._sql_attorney(role)
-        sql_cross = Scores._sql_cross(exam_type)
+            sql_attorney = Scores._sql_attorney(role)
+            sql_cross = Scores._sql_cross(exam_type)
 
-        cursor.execute(
-            f"""
-                INSERT INTO {exam_table} (ballot_score_id, exam_num, attorney, `cross`)
-                    VALUES (%s, %s, %s, %s)
-            """,
-            (new_score_id, exam_num, sql_attorney, sql_cross),
-        )
+            cursor.execute(
+                f"""
+                    INSERT INTO {exam_table} (ballot_score_id, exam_num, attorney, `cross`)
+                        VALUES (%s, %s, %s, %s)
+                """,
+                (new_score_id, exam_num, sql_attorney, sql_cross),
+            )
 
-        db.commit()
+            db.commit()
 
-        return {"id": new_score_id, "score": score}
+            return {"id": new_score_id, "score": score}
 
     @staticmethod
     def set_exam_score(ballot_id: int, side, exam_num, role, exam_type, score):
@@ -163,46 +169,50 @@ class Scores:
 
     @staticmethod
     def get_exam_score(ballot_id, side, exam_num, role, exam_type):
-        cursor = db.cursor()
+        with get_cnx() as db:
+            cursor = db.cursor()
 
-        sql_attorney = Scores._sql_attorney(role)
-        sql_cross = Scores._sql_cross(exam_type)
-        sql_pl = Scores._sql_pl(side)
+            sql_attorney = Scores._sql_attorney(role)
+            sql_cross = Scores._sql_cross(exam_type)
+            sql_pl = Scores._sql_pl(side)
 
-        cursor.execute(
-            f"""
-                SELECT id, score
-                    FROM {exam_data_table}
-                WHERE ballot_id = %s AND exam_num = %s AND attorney = %s AND `cross` = %s AND pl = %s
-            """,
-            (ballot_id, exam_num, sql_attorney, sql_cross, sql_pl),
-        )
+            cursor.execute(
+                f"""
+                    SELECT id, score
+                        FROM {exam_data_table}
+                    WHERE ballot_id = %s AND exam_num = %s AND attorney = %s AND `cross` = %s AND pl = %s
+                """,
+                (ballot_id, exam_num, sql_attorney, sql_cross, sql_pl),
+            )
 
-        results = cursor.fetchall()
+            results = cursor.fetchall()
 
-        if len(results) == 0:
-            return None
+            if len(results) == 0:
+                return None
 
-        for (score_id, score) in results:
-            pass
+            for (score_id, score) in results:
+                pass
 
-        return {"id": score_id, "score": score}
+            return {"id": score_id, "score": score}
 
     @staticmethod
     def get_sum(ballot_id, side):
-        cursor = db.cursor()
+        with get_cnx() as db:
+            cursor = db.cursor()
 
-        sql_pl = Scores._sql_pl(side)
+            sql_pl = Scores._sql_pl(side)
 
-        cursor.execute(
-            f"""
-                SELECT side_sum
-                    FROM {sum_table}
-                WHERE ballot_id = %s AND pl = %s
-            """,
-            (ballot_id, sql_pl),
-        )
+            cursor.execute(
+                f"""
+                    SELECT side_sum
+                        FROM {sum_table}
+                    WHERE ballot_id = %s AND pl = %s
+                """,
+                (ballot_id, sql_pl),
+            )
 
-        (score,) = cursor.fetchone()
-
-        return score
+            try:
+                (score,) = cursor.fetchone()
+                return score
+            except:
+                return None

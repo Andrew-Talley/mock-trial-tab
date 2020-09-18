@@ -29,7 +29,7 @@
     "test": "python3 -m unittest tab_rounds/**/test*.py gql_server/tests/*.py",
     "test-gql": "python3 -m unittest gql_server/tests/*.py",
     "enter-virtual-env": "source flask/bin/activate",
-    "start-server": "python3 -m gql_server.gql",
+    "start": "python3 -m gql_server.gql",
     "load-gql-schema": "get-graphql-schema http://localhost:5000/graphql > schema.graphql",
     "collect-coverage": "coverage-3.8 run -m unittest tab_rounds/**/test*.py gql_server/tests/*.py",
     "output-coverage": "coverage report --omit='py-env/*,**/test_*,**/tests/*' -m",

@@ -1,4 +1,4 @@
-from models.connection import db, tables
+from models.connection import get_cnx, tables
 
 tournament_table = tables["tournament"]
 school_table = tables["school"]
@@ -10,102 +10,121 @@ matchup_table = tables["matchup"]
 class Tournament:
     @staticmethod
     def create_tournament(name):
-        cursor = db.cursor()
-        cursor.execute(f"INSERT INTO {tournament_table} (name) VALUES (%s)", (name,))
+        with get_cnx() as db:
+            cursor = db.cursor()
 
-        db.commit()
+            cursor.execute(
+                f"INSERT INTO {tournament_table} (name) VALUES (%s)", (name,)
+            )
 
-        return cursor.lastrowid
+            db.commit()
+
+            return cursor.lastrowid
 
     @staticmethod
     def get_all_tournaments():
-        cursor = db.cursor()
-        cursor.execute(f"SELECT * FROM {tournament_table}")
+        with get_cnx() as db:
+            cursor = db.cursor()
+            cursor.execute(f"SELECT * FROM {tournament_table}")
 
-        tournaments = []
-        for (id, name) in cursor.fetchall():
-            tournaments.append({"id": id, "name": name})
+            tournaments = []
+            for (id, name) in cursor.fetchall():
+                tournaments.append({"id": id, "name": name})
 
-        return tournaments
+            return tournaments
 
     @staticmethod
     def get_all_info_for_tournament(id):
-        cursor = db.cursor()
-        cursor.execute(
-            f"SELECT * FROM {tournament_table} WHERE tournament_id = %s", (id,)
-        )
+        with get_cnx() as db:
+            cursor = db.cursor()
 
-        (id, name) = cursor.fetchone()
+            cursor.execute(
+                f"SELECT tournament_id, name FROM {tournament_table} WHERE tournament_id = %s", (id,)
+            )
 
-        return {"id": id, "name": name}
+            (id, name) = cursor.fetchone()
+
+            return {"id": id, "name": name}
 
     @staticmethod
     def get_schools_for_tournament(tournament_id: int):
-        cursor = db.cursor()
-        cursor.execute(
-            f"SELECT * FROM {school_table} WHERE tournament_id = %s", (tournament_id,)
-        )
+        with get_cnx() as db:
+            cursor = db.cursor()
 
-        schools = []
-        for tourn_id, name in cursor.fetchall():
-            schools.append({"tournament_id": tourn_id, "name": name})
+            cursor.execute(
+                f"SELECT * FROM {school_table} WHERE tournament_id = %s",
+                (tournament_id,),
+            )
 
-        return schools
+            schools = []
+            for tourn_id, name in cursor.fetchall():
+                schools.append({"tournament_id": tourn_id, "name": name})
+
+            return schools
 
     @staticmethod
     def get_teams_for_tournament(tournament_id: int):
-        cursor = db.cursor()
-        cursor.execute(
-            f"SELECT * FROM {team_table} WHERE tournament_id = %s", (tournament_id,)
-        )
+        with get_cnx() as db:
+            cursor = db.cursor()
 
-        teams = []
-        for tourn_id, team_num, school_name, team_name in cursor.fetchall():
-            teams.append(
-                {
-                    "tournament_id": tourn_id,
-                    "num": team_num,
-                    "name": team_name,
-                    "school_name": school_name,
-                }
+            cursor.execute(
+                f"SELECT * FROM {team_table} WHERE tournament_id = %s", (tournament_id,)
             )
 
-        return teams
+            teams = []
+            for tourn_id, team_num, school_name, team_name in cursor.fetchall():
+                teams.append(
+                    {
+                        "tournament_id": tourn_id,
+                        "num": team_num,
+                        "name": team_name,
+                        "school_name": school_name,
+                    }
+                )
+
+            return teams
 
     @staticmethod
     def get_judges_for_tournament(tournament_id: int):
-        cursor = db.cursor()
-        cursor.execute(
-            f"SELECT * FROM {judge_table} WHERE tournament_id = %s", (tournament_id,)
-        )
+        with get_cnx() as db:
+            cursor = db.cursor()
 
-        teams = []
-        for tournament_id, judge_id, name in cursor.fetchall():
-            teams.append(
-                {"tournament_id": tournament_id, "id": judge_id, "name": name,}
+            cursor.execute(
+                f"SELECT tournament_id, id, name FROM {judge_table} WHERE tournament_id = %s",
+                (tournament_id,),
             )
 
-        return teams
+            teams = []
+            for tournament_id, judge_id, name in cursor.fetchall():
+                teams.append(
+                    {"tournament_id": tournament_id, "id": judge_id, "name": name,}
+                )
+
+            return teams
 
     @staticmethod
     def get_all_rounds(tournament_id: int):
-        cursor = db.cursor()
-        cursor.execute(
-            f"SELECT DISTINCT round_num FROM {matchup_table} WHERE tournament_id = %s",
-            (tournament_id,),
-        )
+        with get_cnx() as db:
+            cursor = db.cursor()
 
-        rounds = [num for (num,) in cursor.fetchall()]
+            cursor.execute(
+                f"SELECT DISTINCT round_num FROM {matchup_table} WHERE tournament_id = %s",
+                (tournament_id,),
+            )
 
-        return rounds
+            rounds = [num for (num,) in cursor.fetchall()]
+
+            return rounds
 
     @staticmethod
     def delete_tournament(id):
-        cursor = db.cursor()
-        cursor.execute(
-            f"DELETE FROM {tournament_table} WHERE tournament_id = %s", (id,)
-        )
+        with get_cnx() as db:
+            cursor = db.cursor()
 
-        db.commit()
+            cursor.execute(
+                f"DELETE FROM {tournament_table} WHERE tournament_id = %s", (id,)
+            )
 
-        return True
+            db.commit()
+
+            return True

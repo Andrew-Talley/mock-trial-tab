@@ -6,9 +6,6 @@ generates:
     plugins:
       - "typescript"
       - "typescript-operations"
-    config:
-      scalars:
-        Side: "'P' | 'D'"
   ./graphql.schema.json:
     plugins:
       - "introspection"

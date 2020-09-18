@@ -18,6 +18,7 @@ from mutations.assign_cross_order import AssignCrossOrder
 from mutations.assign_witness_name import AssignWitnessName
 from mutations.assign_speech_score import AssignSpeechScore
 from mutations.assign_exam_score import AssignExamScore
+from mutations.complete_ballot import CompleteBallot
 
 
 class CreateTournament(graphene.Mutation):
@@ -39,7 +40,7 @@ class AddSchool(graphene.Mutation):
         tournament = graphene.ID(required=True)
         name = graphene.String(required=True)
 
-    Output = School
+    Output = graphene.NonNull(School)
 
     @staticmethod
     def mutate(parent, info, tournament, name):
@@ -112,3 +113,5 @@ class Mutation(graphene.ObjectType):
     assign_speech_score = AssignSpeechScore.Field(required=True)
 
     assign_exam_score = AssignExamScore.Field(required=True)
+
+    complete_ballot = CompleteBallot.Field(required=True)

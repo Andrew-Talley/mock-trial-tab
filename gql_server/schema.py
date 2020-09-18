@@ -14,7 +14,7 @@ from models.judge import Judge as SQLJudge
 class TournamentQuery:
     tournament = graphene.Field(
         Tournament,
-        args={"id": graphene.Argument(graphene.Int, required=True)},
+        args={"id": graphene.Argument(graphene.ID, required=True)},
         required=True,
     )
 

@@ -5,14 +5,17 @@
 1. Run `source py-env/bin/activate`
 2. Run `npm run start-server` (or `python3 -m gql_server.gql`)
 
-The server will then be available on localhost:5000/graphql
+The server will then be available on localhost:5000/graphql. Make sure to configure a `.env` file that links to a MySQL server – see `models/connection.py` for how that needs to look.
 
 ## Testing
 ### Python
 1. Run `source py-env/bin/activate`
 2. Run `npm run test`
 
-## Contributing
+## Front End
+Go to the [https://github.com/Andrew-Talley/mock-trial-tab-front-end](repo for the React/Next.js-based front-end).
+
+<!-- ## Contributing
 If you want to contribute, thank you! You can help whether or not you know python, or know how to code at all.
 
 ### How anyone can contribute:
@@ -30,4 +33,4 @@ If you want to contribute, thank you! You can help whether or not you know pytho
 ### How developers can contribute:
 1. Add tests!
 2. Improve 
-3. Address any open buperformancegs, or ask to take on a feature request (if you want to add your own feature, open an issue first to get the go-ahead).
+3. Address any open buperformancegs, or ask to take on a feature request (if you want to add your own feature, open an issue first to get the go-ahead). -->

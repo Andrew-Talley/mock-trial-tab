@@ -77,7 +77,8 @@ class Team(graphene.ObjectType):
             results = [
                 [
                     Result.WIN if pd > 0 else Result.TIE if pd == 0 else Result.LOSS
-                    for pd in round_pds if pd is not None
+                    for pd in round_pds
+                    if pd is not None
                 ]
                 for round_pds in pds
             ]
@@ -124,7 +125,41 @@ class Student(graphene.ObjectType):
 
 class BallotSide(graphene.ObjectType):
     side = graphene.Field(Side, required=True)
+
+    _ballot: Ballot = None
+
     speech = graphene.Int(args={"speech": graphene.Argument(Speech, required=True)})
+
+    @staticmethod
+    def get_speech_attr(parent, speech, key):
+        speech_data = models.BallotSections.get_speech_section(
+            parent._ballot.id, parent.side, speech
+        )
+        if speech_data is None:
+            return None
+        return speech_data[key]
+
+    @staticmethod
+    def get_exam_attr(parent, info, order, role, exam_type, attr):
+        exam = models.BallotSections.get_exam_section(
+            parent._ballot.id, parent.side, order, role, exam_type
+        )
+        if exam is None:
+            return None
+        return exam[attr]
+
+    @staticmethod
+    def resolve_speech(parent, info, speech):
+        return BallotSide.get_speech_attr(parent, speech, "score")
+
+    speech_notes = graphene.String(
+        args={"speech": graphene.Argument(Speech, required=True)}
+    )
+
+    @staticmethod
+    def resolve_speech_notes(parent, info, speech):
+        return BallotSide.get_speech_attr(parent, speech, "notes")
+
     exam = graphene.Int(
         args={
             "order": graphene.Int(required=True),
@@ -133,29 +168,27 @@ class BallotSide(graphene.ObjectType):
         },
     )
 
-    side_sum = graphene.Int(required=True, name="sum")
-
-    _ballot: Ballot = None
-
-    @staticmethod
-    def resolve_speech(parent, info, speech):
-        speech = models.Scores.get_speech_score(parent._ballot.id, parent.side, speech)
-        if speech is None:
-            return None
-        return speech["score"]
-
     @staticmethod
     def resolve_exam(parent, info, order, role, exam_type):
-        exam = models.Scores.get_exam_score(
-            parent._ballot.id, parent.side, order, role, exam_type
-        )
-        if exam is None:
-            return None
-        return exam["score"]
+        return BallotSide.get_exam_attr(parent, info, order, role, exam_type, "score")
+
+    exam_notes = graphene.String(
+        args={
+            "order": graphene.Int(required=True),
+            "role": graphene.Argument(Role, required=True),
+            "exam_type": graphene.Argument(ExamType, required=True, name="type"),
+        },
+    )
+
+    @staticmethod
+    def resolve_exam_notes(parent, info, order, role, exam_type):
+        return BallotSide.get_exam_attr(parent, info, order, role, exam_type, "notes")
+
+    side_sum = graphene.Int(required=True, name="sum")
 
     @staticmethod
     def resolve_side_sum(parent, info):
-        return models.Scores.get_sum(parent._ballot.id, parent.side)
+        return models.BallotSections.get_sum(parent._ballot.id, parent.side)
 
 
 class Ballot(graphene.ObjectType):
@@ -167,9 +200,7 @@ class Ballot(graphene.ObjectType):
         BallotSide, args={"side": graphene.Argument(Side, required=True)}, required=True
     )
 
-    pd = graphene.Int(
-        args={"side": graphene.Argument(Side, required=True)}
-    )
+    pd = graphene.Int(args={"side": graphene.Argument(Side, required=True)})
 
     complete = graphene.Boolean(required=True)
 
@@ -181,8 +212,8 @@ class Ballot(graphene.ObjectType):
 
     @staticmethod
     def resolve_pd(parent, info, side):
-        pl_sum = models.Scores.get_sum(parent.id, Side.PL)
-        def_sum = models.Scores.get_sum(parent.id, Side.DEF)
+        pl_sum = models.BallotSections.get_sum(parent.id, Side.PL)
+        def_sum = models.BallotSections.get_sum(parent.id, Side.DEF)
 
         if pl_sum is None or def_sum is None:
             return None
@@ -205,6 +236,7 @@ class Ballot(graphene.ObjectType):
     @staticmethod
     def resolve_matchup(parent, info):
         return Matchup(id=models.Ballot.get_matchup_for_ballot(parent.id))
+
 
 class MatchupWitness(graphene.ObjectType):
     matchup_team = graphene.Field(lambda: MatchupTeam, required=True)

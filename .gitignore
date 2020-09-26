@@ -6,3 +6,4 @@ graphql.schema.json
 **/*.pyc
 py-env/**
 .coverage
+.env

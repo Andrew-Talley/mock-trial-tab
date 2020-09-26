@@ -28,7 +28,7 @@ class Ballot:
                     SET complete = {1 if complete else 0}
                 WHERE id = %s
                 """,
-                (ballot_id,)
+                (ballot_id,),
             )
 
             db.commit()
@@ -72,9 +72,9 @@ class Ballot:
                     FROM {ballot_table}
                 WHERE id = %s
                 """,
-                (ballot_id,)
+                (ballot_id,),
             )
 
             (matchup,) = cursor.fetchone()
-            
+
             return matchup

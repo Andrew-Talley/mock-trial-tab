@@ -17,8 +17,10 @@ from mutations.assign_attorney_to_direct import AssignAttorneyToDirect
 from mutations.assign_cross_order import AssignCrossOrder
 from mutations.assign_witness_name import AssignWitnessName
 from mutations.assign_speech_score import AssignSpeechScore
+from mutations.assign_speech_notes import AssignSpeechNotes
 from mutations.assign_exam_score import AssignExamScore
 from mutations.complete_ballot import CompleteBallot
+from mutations.assign_exam_notes import AssignExamNotes
 
 
 class CreateTournament(graphene.Mutation):
@@ -111,7 +113,9 @@ class Mutation(graphene.ObjectType):
     assign_witness_name = AssignWitnessName.Field(required=True)
 
     assign_speech_score = AssignSpeechScore.Field(required=True)
+    assign_speech_notes = AssignSpeechNotes.Field(required=True)
 
     assign_exam_score = AssignExamScore.Field(required=True)
+    assign_exam_notes = AssignExamNotes.Field(required=True)
 
     complete_ballot = CompleteBallot.Field(required=True)

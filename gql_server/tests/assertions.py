@@ -459,6 +459,8 @@ class GraphQLTestCase(unittest.TestCase):
             """
         )
 
+        print(result)
+
         true_score = result.data['tournament']['ballot']['side']['speech']
 
         self.assertEqual(score, true_score)
@@ -558,3 +560,36 @@ class GraphQLTestCase(unittest.TestCase):
         self.assertEqual(wins, record['wins'])
         self.assertEqual(losses, record['losses'])
         self.assertEqual(ties, record['ties'])
+
+    def assertSpeechHasNotes(self, ballot, side, speech, notes):
+        result = schema.execute(f"""
+            query getOpeningNote {{
+                tournament(id: {self.tourn_id}) {{
+                    ballot(id: {ballot}) {{
+                        side(side: {side}) {{
+                            speechNotes(speech: {speech})
+                        }}
+                    }}
+                }}
+            }}
+        """)
+
+        self.assertEqual(result.data['tournament']['ballot']['side']['speechNotes'], notes)
+
+    def assertExamHasNotes(self, notes, cross, witness, exam, side, ballot):
+        role = "WITNESS" if witness else "ATTORNEY"
+        exam_type = "CROSS" if cross else "DIRECT"
+
+        result = schema.execute(f"""
+            query getOpeningNote {{
+                tournament(id: {self.tourn_id}) {{
+                    ballot(id: {ballot}) {{
+                        side(side: {side}) {{
+                            examNotes(order: {exam}, role: {role}, type: {exam_type})
+                        }}
+                    }}
+                }}
+            }}
+        """)
+
+        self.assertEqual(result.data['tournament']['ballot']['side']['examNotes'], notes)

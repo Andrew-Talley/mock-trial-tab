@@ -39,7 +39,8 @@ class Tournament:
             cursor = db.cursor()
 
             cursor.execute(
-                f"SELECT tournament_id, name FROM {tournament_table} WHERE tournament_id = %s", (id,)
+                f"SELECT tournament_id, name FROM {tournament_table} WHERE tournament_id = %s",
+                (id,),
             )
 
             (id, name) = cursor.fetchone()

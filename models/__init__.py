@@ -8,4 +8,4 @@ from models.ballot import Ballot
 from models.student import Student
 from models.role import Role
 from models.examination import Examination
-from models.scores import Scores
+from models.ballot_sections import BallotSections

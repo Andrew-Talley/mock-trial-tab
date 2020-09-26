@@ -6,12 +6,13 @@ from dotenv import load_dotenv
 load_dotenv()
 
 db_config = {
-    "host": os.environ.get('host'),
-    "port": os.environ.get('port'),
-    "username": os.environ.get('username'),
-    "password": os.environ.get('password'),
-    "database": os.environ.get('database'),
+    "host": os.environ.get("host"),
+    "port": os.environ.get("port"),
+    "username": os.environ.get("username"),
+    "password": os.environ.get("password"),
+    "database": os.environ.get("database"),
 }
+
 
 def get_cnx():
     return mysql.connector.connect(**db_config)
@@ -38,4 +39,7 @@ tables = {
     "ballot_side_sum": "BallotSideSum",
     "ballot_info": "BallotInfo",
     "ballot_matchup_info": "BallotMatchupView",
+    "notes": "Notes",
+    "speech_notes": "SpeechNotes",
+    "speech_notes_info": "SpeechNotesInfo",
 }

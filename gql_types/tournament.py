@@ -14,7 +14,7 @@ class Tournament(graphene.ObjectType):
 
     @staticmethod
     def resolve_name(parent, info):
-        return SQLTournament.get_all_info_for_tournament(parent.id)['name']
+        return SQLTournament.get_all_info_for_tournament(parent.id)["name"]
 
     @staticmethod
     def resolve_schools(parent, info):

@@ -2,9 +2,14 @@ from models.connection import get_cnx, tables
 
 ballot_table = tables["ballot"]
 ballot_info = tables["ballot_info"]
+ranks_table = tables["ranks"]
 
 
 class Ballot:
+    @staticmethod
+    def _witness_to_SQL(witness: bool):
+        return 1 if witness else 0
+
     @staticmethod
     def create_ballot(matchup_id, judge_id):
         with get_cnx() as db:
@@ -78,3 +83,38 @@ class Ballot:
             (matchup,) = cursor.fetchone()
 
             return matchup
+
+    @staticmethod
+    def set_rank_for_ballot(ballot_id, witness: bool, rank, student):
+        with get_cnx() as db:
+            cursor = db.cursor()
+            cursor.execute(
+                f"""
+                INSERT INTO {ranks_table} (ballot_id, rank, witness, student)
+                    VALUES (%s, %s, %s, %s)
+
+                ON DUPLICATE KEY UPDATE student = %s
+                """,
+                (ballot_id, rank, Ballot._witness_to_SQL(witness), student, student)
+            )
+
+            db.commit()
+
+    @staticmethod
+    def get_rank_for_ballot(ballot_id, witness: bool, rank):
+        with get_cnx() as db:
+            cursor = db.cursor()
+            cursor.execute(
+                f"""
+                    SELECT student
+                        FROM {ranks_table}
+                    WHERE ballot_id = %s AND witness = %s AND rank = %s
+                """,
+                (ballot_id, Ballot._witness_to_SQL(witness), rank)
+            )
+
+            try:
+                (sid,) = cursor.fetchone()
+                return sid
+            except:
+                return None

@@ -17,14 +17,22 @@ class Examination:
                 (matchup_id, side, order),
             )
 
-            (witness, attorney, crosser, name) = cursor.fetchone()
+            try:
+                (witness, attorney, crosser, name) = cursor.fetchone()
 
-            return {
-                "witness": witness,
-                "attorney": attorney,
-                "crosser": crosser,
-                "name": name,
-            }
+                return {
+                    "witness": witness,
+                    "attorney": attorney,
+                    "crosser": crosser,
+                    "name": name,
+                }
+            except:
+                return {
+                    "witness": None,
+                    "attorney": None,
+                    "crosser": None,
+                    "name": None
+                }
 
     @staticmethod
     def assign_student_to_witness_order(

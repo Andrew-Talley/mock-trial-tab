@@ -42,4 +42,5 @@ tables = {
     "notes": "Notes",
     "speech_notes": "SpeechNotes",
     "speech_notes_info": "SpeechNotesInfo",
+    "ranks": "IndividualAward",
 }

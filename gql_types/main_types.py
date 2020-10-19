@@ -91,12 +91,7 @@ class Team(graphene.ObjectType):
     @staticmethod
     def resolve_wins(parent, info):
         record = Team.get_record(parent, info)
-        try:
-            return record["wins"]
-        except TypeError:
-            print("Failed...")
-            print(Team.get_record(parent, info))
-            raise Exception("Uh oh...")
+        return record["wins"]
 
     losses = graphene.Int(required=True)
 
@@ -202,6 +197,10 @@ class Ballot(graphene.ObjectType):
 
     pd = graphene.Int(args={"side": graphene.Argument(Side, required=True)})
 
+    witness_awards = graphene.List(lambda: MatchupWitness, required=True)
+
+    attorney_awards = graphene.List(lambda: MatchupAttorney, required=True)
+
     complete = graphene.Boolean(required=True)
 
     @staticmethod
@@ -237,19 +236,41 @@ class Ballot(graphene.ObjectType):
     def resolve_matchup(parent, info):
         return Matchup(id=models.Ballot.get_matchup_for_ballot(parent.id))
 
+    @staticmethod
+    def get_individual_awards(parent, info, witness):
+        return [models.Ballot.get_rank_for_ballot(parent.id, witness, rank) for rank in range(1, 5)]
+        
+
+    @staticmethod
+    def resolve_witness_awards(parent, info):
+        ranks = Ballot.get_individual_awards(parent, info, True)
+        return [None if s_id is None else MatchupWitness(student_id=s_id) for s_id in ranks]
+
+    @staticmethod
+    def resolve_attorney_awards(parent, info):
+        ranks = Ballot.get_individual_awards(parent, info, False)
+        return [None if s_id is None else MatchupAttorney(student=Student(id=s_id)) for s_id in ranks]
+
 
 class MatchupWitness(graphene.ObjectType):
     matchup_team = graphene.Field(lambda: MatchupTeam, required=True)
-    order = graphene.Int(required=True)
-    student = graphene.Field(Student, required=True)
-    witness_name = graphene.String(required=True)
+    order = graphene.Int()
+    student = graphene.Field(Student)
+    student_id = graphene.ID(required=True)
+    witness_name = graphene.String()
 
     @staticmethod
     def resolve_student(parent, info):
+        if parent.student_id:
+            return Student(id=parent.student_id)
+
         student_id = models.Examination.get_witness_in_order(
             parent.matchup_team.matchup_id, parent.matchup_team.side, parent.order
         )
-        return Student(id=student_id)
+        if student_id is None:
+            return None
+        else:
+            return Student(id=student_id)
 
     @staticmethod
     def resolve_witness_name(parent, info):
@@ -259,7 +280,7 @@ class MatchupWitness(graphene.ObjectType):
 
 
 class MatchupAttorney(graphene.ObjectType):
-    student = graphene.Field(Student, required=True)
+    student = graphene.Field(Student)
 
 
 class MatchupTeam(graphene.ObjectType):
@@ -309,6 +330,9 @@ class MatchupTeam(graphene.ObjectType):
             student_id = models.Role.get_student_in_role(
                 parent.tournament_id, parent.matchup_id, parent.team_num, role
             )
+            if student_id is None:
+                return None
+
             return MatchupAttorney(student=Student(id=student_id))
 
         order = kwargs.get("order", None)
@@ -316,6 +340,9 @@ class MatchupTeam(graphene.ObjectType):
             attorney_id = models.Examination.get_attorney_in_order(
                 parent.matchup_id, parent.side, order
             )
+            if attorney_id is None:
+                return None
+
             return MatchupAttorney(student=Student(id=attorney_id))
 
         crossing_wit = kwargs.get("crossing_witness_num")
@@ -323,6 +350,9 @@ class MatchupTeam(graphene.ObjectType):
             attorney_id = models.Examination.get_attorney_crossing_witness(
                 parent.matchup_id, parent.side, crossing_wit
             )
+            if attorney_id is None:
+                return None
+                
             return MatchupAttorney(student=Student(id=attorney_id))
 
 
@@ -334,17 +364,11 @@ class Matchup(graphene.ObjectType):
 
     @staticmethod
     def resolve_pl(parent, info):
-        match = models.Matchup.get_matchup(parent.id)
-        t_id, p_id = match.get("tournament_id"), match.get("pl")
-        return MatchupTeam(
-            team_num=match["pl"], tournament_id=t_id, matchup_id=parent.id
-        )
+        return Matchup.resolve_team(parent, info, "pl")
 
     @staticmethod
     def resolve_defense(parent, info):
-        match = models.Matchup.get_matchup(parent.id)
-        t_id, d_id = match.get("tournament_id"), match.get("def")
-        return MatchupTeam(team_num=d_id, tournament_id=t_id, matchup_id=parent.id)
+        return Matchup.resolve_team(parent, info, "def")
 
     round_num = graphene.Int(required=True)
 

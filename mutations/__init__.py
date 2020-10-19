@@ -8,19 +8,20 @@ from models import (
     School as SQLSchool,
 )
 
-from mutations.add_manual_round import AddManualRound
-from mutations.assign_judge_to_matchup import AssignJudgeToMatchup
-from mutations.add_student_to_team import AddStudentToTeam
-from mutations.assign_student_to_role import AssignStudentToRole
-from mutations.assign_witness_order import AssignWitnessOrder
-from mutations.assign_attorney_to_direct import AssignAttorneyToDirect
-from mutations.assign_cross_order import AssignCrossOrder
-from mutations.assign_witness_name import AssignWitnessName
-from mutations.assign_speech_score import AssignSpeechScore
-from mutations.assign_speech_notes import AssignSpeechNotes
-from mutations.assign_exam_score import AssignExamScore
-from mutations.complete_ballot import CompleteBallot
-from mutations.assign_exam_notes import AssignExamNotes
+from .add_manual_round import AddManualRound
+from .assign_judge_to_matchup import AssignJudgeToMatchup
+from .add_student_to_team import AddStudentToTeam
+from .assign_student_to_role import AssignStudentToRole
+from .assign_witness_order import AssignWitnessOrder
+from .assign_attorney_to_direct import AssignAttorneyToDirect
+from .assign_cross_order import AssignCrossOrder
+from .assign_witness_name import AssignWitnessName
+from .assign_speech_score import AssignSpeechScore
+from .assign_speech_notes import AssignSpeechNotes
+from .assign_exam_score import AssignExamScore
+from .complete_ballot import CompleteBallot
+from .assign_exam_notes import AssignExamNotes
+from .assign_individual_award import AssignIndividualAward
 
 
 class CreateTournament(graphene.Mutation):
@@ -117,5 +118,7 @@ class Mutation(graphene.ObjectType):
 
     assign_exam_score = AssignExamScore.Field(required=True)
     assign_exam_notes = AssignExamNotes.Field(required=True)
+
+    assign_individual_award = AssignIndividualAward.Field(required=True)
 
     complete_ballot = CompleteBallot.Field(required=True)

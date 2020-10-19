@@ -26,6 +26,9 @@ class Role:
                 (tournament_id, matchup_id, team_num, role),
             )
 
-            (student_id,) = cursor.fetchone()
+            try:
+                (student_id,) = cursor.fetchone()
 
-            return student_id
+                return student_id
+            except:
+                return None

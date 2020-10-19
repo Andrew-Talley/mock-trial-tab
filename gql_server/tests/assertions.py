@@ -347,13 +347,17 @@ class GraphQLTestCase(unittest.TestCase):
             """
         )
 
-        student_in_role = result.data["tournament"]["matchup"]["team"]["attorney"]['student']
-        self.assertIsNotNone(student_in_role, f"No student assigned to {role}")
-        self.assertEqual(
-            student_in_role["id"],
-            student_id,
-            f"Student {student_id} does not have role {role}",
-        )
+        role = result.data["tournament"]["matchup"]["team"]["attorney"]
+        if student_id is None:
+            self.assertIsNone(role)
+        else:
+            student_in_role = role["student"]
+            self.assertIsNotNone(student_in_role, f"No student assigned to {role}")
+            self.assertEqual(
+                student_in_role["id"],
+                student_id,
+                f"Student {student_id} does not have role {role}",
+            )
 
     def assertWitnessGoesInOrder(self, student_id, order, matchup, side):
         result = schema.execute(
@@ -375,8 +379,10 @@ class GraphQLTestCase(unittest.TestCase):
         )
 
         student = result.data["tournament"]['matchup']['team']['witness']['student']
-
-        self.assertEqual(student['id'], student_id)
+        if student_id is None:
+            self.assertIsNone(student)
+        else:
+            self.assertEqual(student['id'], student_id)
 
     def assertAttorneyDirectsInOrder(self, student_id, order, matchup, side):
         result = schema.execute(
@@ -458,8 +464,6 @@ class GraphQLTestCase(unittest.TestCase):
             }}
             """
         )
-
-        print(result)
 
         true_score = result.data['tournament']['ballot']['side']['speech']
 

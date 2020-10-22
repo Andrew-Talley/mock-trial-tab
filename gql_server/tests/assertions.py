@@ -219,7 +219,7 @@ class GraphQLTestCase(unittest.TestCase):
 
         self.assertEqual(found_round['roundNum'], round_num)
 
-    def assertJudgeHasBallot(self, judge_id, ballot_id):
+    def assertJudgeHasBallot(self, judge_id, ballot_id, should_have_ballot=True):
         result = schema.execute(
             f"""
             query judgeBallots {{
@@ -237,11 +237,9 @@ class GraphQLTestCase(unittest.TestCase):
         true_ballots = result.data["tournament"]["judge"]["ballots"]
 
         has_ballot = any(ballot["id"] == ballot_id for ballot in true_ballots)
-        self.assertTrue(
-            has_ballot, f"Ballot {ballot_id} not found in ballots for judge {judge_id}"
-        )
+        self.assertEqual(has_ballot, should_have_ballot)
 
-    def assertMatchupHasBallot(self, matchup_id, ballot_id):
+    def assertMatchupHasBallot(self, matchup_id, ballot_id, should_have_ballot=True):
         result = schema.execute(
             f"""
             query matchupBallots {{
@@ -259,9 +257,7 @@ class GraphQLTestCase(unittest.TestCase):
         true_ballots = result.data["tournament"]["matchup"]["ballots"]
 
         has_ballot = any(ballot["id"] == ballot_id for ballot in true_ballots)
-        self.assertTrue(
-            has_ballot, f"Ballot {ballot_id} not found in ballots for judge {ballot_id}"
-        )
+        self.assertEqual(has_ballot, should_have_ballot)
 
     def assertHasMatchup(self, matchup_id, pl_num, def_num):
         result = schema.execute(

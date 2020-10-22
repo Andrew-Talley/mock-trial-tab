@@ -1,7 +1,7 @@
 from .test_graphql_server import TestGraphQLServerBase
 from gql_server.schema import schema
 
-class TestIndividualAwards(TestGraphQLServerBase):
+class IndividualAwardsBase(TestGraphQLServerBase):
   def get_attorney_awards(self, ballot):
     result = schema.execute(f"""
       query getWitnessAward {{
@@ -65,6 +65,7 @@ class TestIndividualAwards(TestGraphQLServerBase):
 
     return result.data['assignIndividualAward']
 
+class TestIndividualAwards(IndividualAwardsBase):
   def assertStudentHasRank(self, student, rank, ballot, *, witness=True):
     awards = self.get_witness_awards(ballot) if witness else self.get_attorney_awards(ballot)
     rank_holder = awards[rank - 1]
@@ -136,3 +137,87 @@ class TestIndividualAwards(TestGraphQLServerBase):
     for rank, (witness, attorney) in enumerate(zip(witnesses, attorneys)):
       self.assertStudentHasRank(witness, rank + 1, ballot, witness=True)
       self.assertStudentHasRank(attorney, rank + 1, ballot, witness=False)
+
+class TestIndividualAwardResults(IndividualAwardsBase):
+  def get_outstanding_competitors(self, role):
+    result = schema.execute(
+      f"""
+        query getIndividualAwards {{
+          tournament(id: {self.tourn_id}) {{
+            outstandingCompetitors(role: {role}) {{
+              side
+              ranks
+              student {{
+                id
+              }}
+            }}
+          }}
+        }}
+      """
+    )
+
+    witnesses = result.data['tournament']['outstandingCompetitors']
+    return witnesses
+
+  def test_starts_without_witnesses(self):
+    witnesses = self.get_outstanding_competitors("WITNESS")
+    self.assertEqual(type(witnesses), list)
+    self.assertEqual(len(witnesses), 0)
+
+  def test_sums_individual_awards(self):
+    _, _, ballot = self.add_one_matchup_w_judge()
+    bayes_id = self.add_elizabeth_bayes()
+    self.assign_individual_award(ballot, "WITNESS", bayes_id)
+
+    witnesses = self.get_outstanding_competitors("WITNESS")
+    self.assertEqual(len(witnesses), 1)
+
+    [bayes_award] = witnesses
+    self.assertEqual(bayes_award['side'], "PL")
+    self.assertEqual(bayes_award['ranks'], 10)
+    self.assertEqual(bayes_award['student']['id'], bayes_id)
+
+  def test_sums_attorney_awards(self):
+    _, _, ballot = self.add_one_matchup_w_judge()
+    bayes_id = self.add_elizabeth_bayes()
+    self.assign_individual_award(ballot, "ATTORNEY", bayes_id)
+
+    attorneys = self.get_outstanding_competitors("ATTORNEY")
+    self.assertEqual(len(attorneys), 1)
+
+    [bayes_award] = attorneys
+    self.assertEqual(bayes_award['side'], "PL")
+    self.assertEqual(bayes_award['ranks'], 10)
+    self.assertEqual(bayes_award['student']['id'], bayes_id)
+
+  def test_sums_all_ranks(self):
+    _, _, ballot = self.add_one_matchup_w_judge()
+    bayes_id = self.add_elizabeth_bayes()
+    self.assign_individual_award(ballot, "WITNESS", bayes_id, rank=2)
+
+    [award] = self.get_outstanding_competitors("WITNESS")
+    self.assertEqual(award['ranks'], 8)
+
+  def test_averages_awards_by_number_of_ballots(self):
+    match, _, ballot = self.add_one_matchup_w_judge()
+    bayes_id = self.add_elizabeth_bayes()
+    next_judge = self.add_judge_to_tournament("Michael Avenatti")
+    next_ballot = self.assign_ballot(match, next_judge['id'])
+
+    self.assign_individual_award(ballot, "WITNESS", bayes_id)
+    self.assign_individual_award(next_ballot['id'], "WITNESS", bayes_id)
+    [award] = self.get_outstanding_competitors("WITNESS")
+    self.assertEqual(award['ranks'], 10)
+
+  def test_orders_by_number_of_ranks(self):
+    _, _, ballot = self.add_one_matchup_w_judge()
+
+    students = [self.add_student_to_team(1001, f"Student f{n}")['student']['id'] for n in range(1, 4)]
+
+    for number, student in enumerate(reversed(students)):
+      self.assign_individual_award(ballot, "WITNESS", student, 1 + number)
+
+    award_winners = self.get_outstanding_competitors("WITNESS")
+
+    for winner, expectedRank in zip(award_winners, range(10, 4, -2)):
+      self.assertEqual(winner['ranks'], expectedRank)

@@ -246,8 +246,16 @@ class BallotSections:
 
     @staticmethod
     def set_exam_notes(ballot_id: int, side, exam_num, role, exam_type, notes):
-        existing_id = BallotSections.get_exam_section(ballot_id, side, exam_num, role, exam_type)
+        existing_id = BallotSections.get_exam_section(
+            ballot_id, side, exam_num, role, exam_type
+        )
 
-        true_id = existing_id['id'] if existing_id is not None else BallotSections._add_exam_section(ballot_id, side, exam_num, role, exam_type)
+        true_id = (
+            existing_id["id"]
+            if existing_id is not None
+            else BallotSections._add_exam_section(
+                ballot_id, side, exam_num, role, exam_type
+            )
+        )
 
         BallotSections._set_section_note(true_id, notes)

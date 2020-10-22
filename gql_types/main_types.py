@@ -238,18 +238,25 @@ class Ballot(graphene.ObjectType):
 
     @staticmethod
     def get_individual_awards(parent, info, witness):
-        return [models.Ballot.get_rank_for_ballot(parent.id, witness, rank) for rank in range(1, 5)]
-        
+        return [
+            models.Ballot.get_rank_for_ballot(parent.id, witness, rank)
+            for rank in range(1, 5)
+        ]
 
     @staticmethod
     def resolve_witness_awards(parent, info):
         ranks = Ballot.get_individual_awards(parent, info, True)
-        return [None if s_id is None else MatchupWitness(student_id=s_id) for s_id in ranks]
+        return [
+            None if s_id is None else MatchupWitness(student_id=s_id) for s_id in ranks
+        ]
 
     @staticmethod
     def resolve_attorney_awards(parent, info):
         ranks = Ballot.get_individual_awards(parent, info, False)
-        return [None if s_id is None else MatchupAttorney(student=Student(id=s_id)) for s_id in ranks]
+        return [
+            None if s_id is None else MatchupAttorney(student=Student(id=s_id))
+            for s_id in ranks
+        ]
 
 
 class MatchupWitness(graphene.ObjectType):
@@ -352,7 +359,7 @@ class MatchupTeam(graphene.ObjectType):
             )
             if attorney_id is None:
                 return None
-                
+
             return MatchupAttorney(student=Student(id=attorney_id))
 
 
@@ -397,6 +404,13 @@ class Matchup(graphene.ObjectType):
     def resolve_ballots(parent, info):
         ids = models.Matchup.get_ballots(parent.id)
         return [Ballot(id=id) for id in ids]
+
+    notes = graphene.String()
+
+    @staticmethod
+    def resolve_notes(parent, info):
+        new_notes = models.Matchup.get_notes(parent.id)
+        return new_notes
 
 
 class Judge(graphene.ObjectType):

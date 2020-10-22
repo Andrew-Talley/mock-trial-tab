@@ -22,6 +22,8 @@ from .assign_exam_score import AssignExamScore
 from .complete_ballot import CompleteBallot
 from .assign_exam_notes import AssignExamNotes
 from .assign_individual_award import AssignIndividualAward
+from .delete_ballot import DeleteBallot
+from .assign_matchup_notes import AssignMatchupNotes
 
 
 class CreateTournament(graphene.Mutation):
@@ -103,6 +105,7 @@ class Mutation(graphene.ObjectType):
     assign_student_to_role = AssignStudentToRole.Field()
 
     add_manual_round = AddManualRound.Field()
+    assign_matchup_notes = AssignMatchupNotes.Field(required=True)
 
     add_judge = AddJudge.Field(required=True)
     add_judge_conflict = AddJudgeConflict.Field(required=True)
@@ -122,3 +125,4 @@ class Mutation(graphene.ObjectType):
     assign_individual_award = AssignIndividualAward.Field(required=True)
 
     complete_ballot = CompleteBallot.Field(required=True)
+    delete_ballot = DeleteBallot.Field(required=True)

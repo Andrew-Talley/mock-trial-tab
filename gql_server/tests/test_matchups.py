@@ -2,6 +2,40 @@ from gql_server.schema import schema
 from .test_graphql_server import TestGraphQLServerBase
 
 class TestMatchups(TestGraphQLServerBase):
+    def get_matchup_notes(self, matchup):
+        result = schema.execute(
+            f"""
+                query getMatchupNotes {{
+                    tournament(id: {self.tourn_id}) {{
+                        matchup(id: {matchup}) {{
+                            notes
+                        }}
+                    }}
+                }}
+            """
+        )
+
+        notes = result.data['tournament']['matchup']['notes']
+        return notes
+
+    def assign_notes(self, matchup, notes):
+        result = schema.execute(
+            f"""
+                mutation setMatchupNotes {{
+                    assignMatchupNotes(tournament: {self.tourn_id}, matchup: {matchup}, notes: "{notes}") {{
+                        matchup {{
+                            id
+                        }}
+                        notes
+                    }}
+                }}
+            """
+        )
+
+        result = result.data['assignMatchupNotes']
+
+        return result
+
     def test_starts_with_no_rounds(self):
         self.assertHasNumRounds(0)
 
@@ -54,7 +88,7 @@ class TestMatchups(TestGraphQLServerBase):
         self.assertEqual(round_num, 1)
 
     def test_matchup_teams_are_fully_explorable(self):
-        [matchup, _] = self.add_default_r1_setup()
+        matchup = self.add_one_matchup_setup()
         result = schema.execute(
             f"""
             query teamMatchups {{
@@ -86,3 +120,23 @@ class TestMatchups(TestGraphQLServerBase):
         de = match['def']['team']
         self.assertEqual(de['num'], 1101)
         self.assertEqual(de['name'], "Midlands State University A")
+
+    def test_matchup_starts_with_no_notes(self):
+        matchup = self.add_one_matchup_setup()
+        notes = self.get_matchup_notes(matchup)
+        self.assertIsNone(notes)
+
+    def test_can_assign_notes(self):
+        matchup = self.add_one_matchup_setup()
+        result = self.assign_notes(matchup, "Hello, World!")
+        self.assertEqual(result['matchup']['id'], matchup)
+        self.assertEqual(result['notes'], "Hello, World!")
+
+        notes = self.get_matchup_notes(matchup)
+        self.assertEqual(notes, "Hello, World!")
+
+    def test_can_reassign_notes(self):
+        matchup = self.add_one_matchup_setup()
+        self.assign_notes(matchup, "Hey there!")
+        self.assign_notes(matchup, "Hey there Delilah")
+        self.assertEqual(self.get_matchup_notes(matchup), "Hey there Delilah")

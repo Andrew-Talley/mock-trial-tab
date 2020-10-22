@@ -3,6 +3,7 @@ import graphene
 from gql_types import Side, Speech
 from models import BallotSections
 
+from .protect_ballot_code import protect_ballot_code
 
 class AssignSpeechScore(graphene.Mutation):
     class Arguments:
@@ -15,5 +16,6 @@ class AssignSpeechScore(graphene.Mutation):
 
     @staticmethod
     def mutate(parent, info, ballot, side, speech, score):
+        protect_ballot_code(info)
         BallotSections.set_speech_score(ballot, side, speech, score)
         return score

@@ -1,7 +1,30 @@
+import unittest
 from gql_server.schema import schema
 from .test_graphql_server import TestGraphQLServerBase
 
 class TestScoring(TestGraphQLServerBase):
+    @unittest.skip("Throws error")
+    def test_cannot_assign_score_without_code(self):
+        _, _, ballot = self.add_one_matchup_w_judge()
+
+        result = schema.execute(
+            f"""
+                mutation openingScore {{
+                    assignSpeechScore(ballot: {ballot}, side: PL, speech: OPENING, score: 10)
+                }}
+            """
+        )
+        self.assertIsNotNone(result.errors)
+
+        result = schema.execute(
+            f"""
+                mutation examinationScore {{
+                    assignExamScore(ballot: {ballot}, side: PL, exam: 1, witness: true, cross: true, score: 10)
+                }}
+            """
+        )
+        self.assertIsNotNone(result.errors)
+
     def test_can_score_and_modify_opening(self):
         _, judge, ballot = self.add_one_matchup_w_judge()
 

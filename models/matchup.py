@@ -61,3 +61,38 @@ class Matchup:
             ballot_ids = [bid for (bid,) in cursor.fetchall()]
 
             return ballot_ids
+
+    @staticmethod
+    def get_notes(matchup_id: int):
+        with get_cnx() as db:
+
+            cursor = db.cursor()
+            cursor.execute(
+                f"""
+                    SELECT notes
+                        FROM {matchup_table}
+                    WHERE id = %s
+                """,
+                (matchup_id,)
+            )
+
+            (notes,) = cursor.fetchone()
+
+            return notes
+
+    @staticmethod
+    def set_notes(matchup_id: int, notes: str):
+        with get_cnx() as db:
+            cursor = db.cursor()
+            cursor.execute(
+                f"""
+                    UPDATE {matchup_table}
+                        SET notes = %s
+                    WHERE id = %s
+                """,
+                (notes, matchup_id,)
+            )
+
+            db.commit()
+            
+            return True

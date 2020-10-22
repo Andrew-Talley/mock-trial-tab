@@ -5,6 +5,7 @@ school_table = tables["school"]
 team_table = tables["team"]
 judge_table = tables["judge"]
 matchup_table = tables["matchup"]
+indiv_awards_table = tables["awards"]
 
 
 class Tournament:
@@ -116,6 +117,27 @@ class Tournament:
             rounds = [num for (num,) in cursor.fetchall()]
 
             return rounds
+
+    @staticmethod
+    def get_all_witness_awards(tournament_id: int):
+        with get_cnx() as db:
+            cursor = db.cursor()
+
+            cursor.execute(
+                f"""
+                SELECT student_name, id, ranks
+                    FROM {indiv_awards_table}
+                WHERE tournament_id = %s
+                ORDER BY ranks DESC
+                """,
+                (tournament_id,),
+            )
+
+            winners = []
+            for (name, sid, ranks) in cursor.fetchall():
+                winners.append({"name": name, "id": sid, "ranks": ranks})
+
+            return winners
 
     @staticmethod
     def delete_tournament(id):

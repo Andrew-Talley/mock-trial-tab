@@ -31,7 +31,7 @@ class Examination:
                     "witness": None,
                     "attorney": None,
                     "crosser": None,
-                    "name": None
+                    "name": None,
                 }
 
     @staticmethod

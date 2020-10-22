@@ -95,7 +95,7 @@ class Ballot:
 
                 ON DUPLICATE KEY UPDATE student = %s
                 """,
-                (ballot_id, rank, Ballot._witness_to_SQL(witness), student, student)
+                (ballot_id, rank, Ballot._witness_to_SQL(witness), student, student),
             )
 
             db.commit()
@@ -110,7 +110,7 @@ class Ballot:
                         FROM {ranks_table}
                     WHERE ballot_id = %s AND witness = %s AND rank = %s
                 """,
-                (ballot_id, Ballot._witness_to_SQL(witness), rank)
+                (ballot_id, Ballot._witness_to_SQL(witness), rank),
             )
 
             try:
@@ -118,3 +118,19 @@ class Ballot:
                 return sid
             except:
                 return None
+
+    @staticmethod
+    def delete_ballot(ballot_id):
+        with get_cnx() as db:
+            cursor = db.cursor()
+            cursor.execute(
+                f"""
+                    DELETE FROM {ballot_table}
+                        WHERE id = %s
+                """,
+                (ballot_id,)
+            )
+            
+            db.commit()
+
+            return True

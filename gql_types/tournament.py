@@ -2,8 +2,10 @@ import graphene
 
 from models import Tournament as SQLTournament, Judge as SQLJudge, Team as SQLTeam
 
-from gql_types.main_types import School, Team, Judge, Matchup, Ballot
-from gql_types.round import Round
+from .main_types import School, Team, Judge, Matchup, Ballot, Student
+from .round import Round
+from .enums import Side, Role
+from .individual_award import IndividualAward
 
 
 class Tournament(graphene.ObjectType):
@@ -113,3 +115,27 @@ class Tournament(graphene.ObjectType):
     @staticmethod
     def resolve_ballot(parent, info, id):
         return Ballot(id=id)
+
+    outstanding_witnesses = graphene.List(
+        graphene.NonNull(IndividualAward), required=True
+    )
+
+    @staticmethod
+    def resolve_outstanding_witnesses(parent, info):
+        return Tournament.resolve_outstanding_competitors(parent, info, Role.WITNESS)
+        # return [IndividualAward(side=Side.PL, ranks=10, student=Student(id=1,name="Elizabeth Bayes"))]
+
+    outstanding_competitors = graphene.List(
+        graphene.NonNull(IndividualAward),
+        required=True,
+        args={"role": graphene.Argument(Role, required=True)},
+    )
+
+    @staticmethod
+    def resolve_outstanding_competitors(parent, info, role):
+        return [
+            IndividualAward(
+                side=Side.PL, ranks=s['ranks'], student=Student(id=s["id"], name=s["name"])
+            )
+            for s in SQLTournament.get_all_witness_awards(parent.id)
+        ]

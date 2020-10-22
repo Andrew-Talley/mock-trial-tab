@@ -56,7 +56,24 @@ class TestJudges(TestGraphQLServerBase):
             self.assign_ballot(m2, judge_id)
 
     def test_assigned_ballot_appears_in_graph(self):
-        matchup_id, judge_id, new_ballot = self.add_one_matchup_w_judge()
+        matchup, judge, new_ballot = self.add_one_matchup_w_judge()
 
-        self.assertJudgeHasBallot(judge_id, new_ballot)
-        self.assertMatchupHasBallot(matchup_id, new_ballot)
+        self.assertJudgeHasBallot(judge, new_ballot)
+        self.assertMatchupHasBallot(matchup, new_ballot)
+
+    def test_can_delete_ballot(self):
+        matchup, judge, ballot = self.add_one_matchup_w_judge()
+
+        result = schema.execute(
+            f"""
+                mutation deleteBallot {{
+                    deleteBallot(id: {ballot})
+                }}
+            """
+        )
+
+        self.assertIsNone(result.errors)
+
+        self.assertJudgeHasBallot(judge, ballot, should_have_ballot=False)
+        self.assertMatchupHasBallot(matchup, ballot, should_have_ballot=False)
+

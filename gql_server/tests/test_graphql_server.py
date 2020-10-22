@@ -2,11 +2,21 @@ import sys
 import unittest
 
 from itertools import chain, repeat
+from os import environ
 
 from gql_server.schema import schema
 from models.tournament import Tournament
 
 from .assertions import GraphQLTestCase
+
+
+class FakeHeader:
+    @staticmethod
+    def get(key):
+        return environ.get('code')
+
+class FakeInfo:
+    headers = FakeHeader()
 
 class TestGraphQLServerBase(GraphQLTestCase):
     def _to_GQL_bool(self, value):
@@ -392,7 +402,9 @@ class TestGraphQLServerBase(GraphQLTestCase):
             mutation openingScore {{
                 {self._speech_assignment(ballot, side, speech, score)}
             }}
-            """
+            """,
+            None,
+            FakeInfo
         )
         
         score = result.data['assignSpeechScore']
@@ -408,7 +420,9 @@ class TestGraphQLServerBase(GraphQLTestCase):
                 mutation addWitnessScore {{
                     {self._exam_assignment(ballot, side, exam, witness, cross, score)}
                 }}
-            """
+            """,
+            None,
+            FakeInfo
         )
 
         return result.data['assignExamScore']
@@ -456,7 +470,9 @@ class TestGraphQLServerBase(GraphQLTestCase):
                 pClose: {speech_assignment("PL", "CLOSING")}
                 dClose: {speech_assignment("DEF", "CLOSING")}
             }}
-            """
+            """,
+            None,
+            FakeInfo
         )
 
     def assign_speech_notes(self, ballot, side, speech, notes):

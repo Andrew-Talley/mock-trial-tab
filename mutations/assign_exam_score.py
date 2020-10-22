@@ -3,6 +3,8 @@ import graphene
 from gql_types import Side, Role, ExamType
 from models import BallotSections
 
+from .protect_ballot_code import protect_ballot_code
+
 
 class AssignExamScore(graphene.Mutation):
     class Arguments:
@@ -19,6 +21,7 @@ class AssignExamScore(graphene.Mutation):
 
     @staticmethod
     def mutate(parent, info, ballot, side, exam, witness, cross, score):
+        protect_ballot_code(info)
         role = Role.WITNESS if witness else Role.ATTORNEY
         exam_type = ExamType.CROSS if cross else ExamType.DIRECT
         exam_score = BallotSections.set_exam_score(

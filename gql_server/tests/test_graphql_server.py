@@ -190,12 +190,13 @@ class TestGraphQLServerBase(GraphQLTestCase):
 
         return newTeam
 
-    def assign_ballot(self, matchup_id, judge_id):
+    def assign_ballot(self, matchup_id, judge_id, note_only = False):
         result = schema.execute(
             f"""
             mutation assignBallot {{
-                assignJudgeToMatchup(tournament: {self.tourn_id}, matchup: {matchup_id}, judge: {judge_id}) {{
+                assignJudgeToMatchup(tournament: {self.tourn_id}, matchup: {matchup_id}, judge: {judge_id}, noteOnly: {self._to_GQL_bool(note_only)}) {{
                     id
+                    noteOnly
                     judge {{
                         id
                     }}
@@ -213,6 +214,7 @@ class TestGraphQLServerBase(GraphQLTestCase):
             "id": newBallot["id"],
             "judge": newBallot["judge"]["id"],
             "matchup": newBallot["matchup"]["id"],
+            "note_only": newBallot["noteOnly"],
         }
 
     def assign_student_to_role(self, matchup, team, student, role):

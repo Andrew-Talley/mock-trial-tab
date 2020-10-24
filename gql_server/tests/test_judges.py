@@ -103,18 +103,27 @@ class TestJudges(TestGraphQLServerBase):
     def test_can_assign_score_only_ballots(self):
         match = self.add_one_matchup_setup()
         judge = self.add_judge_to_tournament("John G. Roberts, Jr.")['id']
+        ballot = self.assign_ballot(match, judge, note_only=True)
+
+        self.assertEqual(ballot['note_only'], True)
+
+    def test_can_toggle_note_only(self):
+        matchup, judge, ballot = self.add_one_matchup_w_judge()
 
         result = schema.execute(
             f"""
-                mutation assignBallot {{
-                    assignJudgeToMatchup(tournament: {self.tourn_id}, judge: {judge}, matchup: {match}, noteOnly: true) {{
+                mutation noteOnly {{
+                    noteOnlyBallot(id: {ballot}, noteOnly: true) {{
+                        id
                         noteOnly
                     }}
                 }}
             """
         )
 
-        self.assertEqual(result.data['assignJudgeToMatchup']['noteOnly'], True)
+        ballot_info = result.data['noteOnlyBallot']
+        self.assertEqual(ballot_info['noteOnly'], True)
+
 
     def test_can_delete_ballot(self):
         matchup, judge, ballot = self.add_one_matchup_w_judge()

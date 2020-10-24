@@ -144,6 +144,21 @@ class Ballot:
             }
 
     @staticmethod
+    def set_score_only(ballot_id, score_only):
+        with get_cnx() as db:
+            cursor = db.cursor()
+            cursor.execute(
+                f"""
+                    UPDATE {ballot_table}
+                        SET note_only = %s
+                    WHERE id = %s
+                """,
+                (Ballot._bool_to_SQL(score_only), ballot_id)
+            )
+
+            db.commit()
+
+    @staticmethod
     def delete_ballot(ballot_id):
         with get_cnx() as db:
             cursor = db.cursor()

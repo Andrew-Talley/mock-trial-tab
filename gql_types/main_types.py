@@ -258,6 +258,18 @@ class Ballot(graphene.ObjectType):
             for s_id in ranks
         ]
 
+    presiding = graphene.Boolean(required=True)
+
+    @staticmethod
+    def resolve_presiding(parent, info):
+        return models.Ballot.get_ballot(parent.id)['presiding']
+
+    note_only = graphene.Boolean(required=True)
+
+    @staticmethod
+    def resolve_note_only(parent, info):
+        return models.Ballot.get_ballot(parent.id)['note_only']
+
 
 class MatchupWitness(graphene.ObjectType):
     matchup_team = graphene.Field(lambda: MatchupTeam, required=True)

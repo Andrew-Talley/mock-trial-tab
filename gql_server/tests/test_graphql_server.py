@@ -104,6 +104,7 @@ class TestGraphQLServerBase(GraphQLTestCase):
                     judge(id: {judge_id}) {{
                         id
                         name
+                        email
                     }}
                 }}
             }}

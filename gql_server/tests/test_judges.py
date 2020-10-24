@@ -80,6 +80,42 @@ class TestJudges(TestGraphQLServerBase):
         self.assertEqual(result['id'], judge)
         self.assertEqual(result['email'], "fake@fake.com")
 
+        info = self.get_judge_info(judge)
+
+        self.assertEqual(info['email'], "fake@fake.com")
+
+    def test_can_assign_presiding_ballots(self):
+        match = self.add_one_matchup_setup()
+        judge = self.add_judge_to_tournament("John G. Roberts, Jr.")['id']
+
+        result = schema.execute(
+            f"""
+                mutation assignBallot {{
+                    assignJudgeToMatchup(tournament: {self.tourn_id}, judge: {judge}, matchup: {match}, presiding: true) {{
+                        presiding
+                    }}
+                }}
+            """
+        )
+
+        self.assertEqual(result.data['assignJudgeToMatchup']['presiding'], True)
+
+    def test_can_assign_score_only_ballots(self):
+        match = self.add_one_matchup_setup()
+        judge = self.add_judge_to_tournament("John G. Roberts, Jr.")['id']
+
+        result = schema.execute(
+            f"""
+                mutation assignBallot {{
+                    assignJudgeToMatchup(tournament: {self.tourn_id}, judge: {judge}, matchup: {match}, noteOnly: true) {{
+                        noteOnly
+                    }}
+                }}
+            """
+        )
+
+        self.assertEqual(result.data['assignJudgeToMatchup']['noteOnly'], True)
+
     def test_can_delete_ballot(self):
         matchup, judge, ballot = self.add_one_matchup_w_judge()
 

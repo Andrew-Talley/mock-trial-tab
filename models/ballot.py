@@ -11,7 +11,7 @@ class Ballot:
         return 1 if witness else 0
 
     @staticmethod
-    def create_ballot(matchup_id, judge_id, presiding = False, note_only = False):
+    def create_ballot(matchup_id, judge_id, presiding=False, note_only=False):
         with get_cnx() as db:
             cursor = db.cursor()
             cursor.execute(
@@ -20,7 +20,12 @@ class Ballot:
                     (matchup_id, judge_id, presiding, note_only) 
                 VALUES (%s, %s, %s, %s)
                 """,
-                (matchup_id, judge_id, Ballot._bool_to_SQL(presiding), Ballot._bool_to_SQL(note_only)),
+                (
+                    matchup_id,
+                    judge_id,
+                    Ballot._bool_to_SQL(presiding),
+                    Ballot._bool_to_SQL(note_only),
+                ),
             )
 
             db.commit()
@@ -133,15 +138,12 @@ class Ballot:
                         FROM {ballot_table}
                     WHERE id = %s
                 """,
-                (ballot_id,)
+                (ballot_id,),
             )
 
             (preside, note_only) = cursor.fetchone()
 
-            return {
-                "presiding": preside == 1,
-                "note_only": note_only == 1
-            }
+            return {"presiding": preside == 1, "note_only": note_only == 1}
 
     @staticmethod
     def set_score_only(ballot_id, score_only):
@@ -153,7 +155,7 @@ class Ballot:
                         SET note_only = %s
                     WHERE id = %s
                 """,
-                (Ballot._bool_to_SQL(score_only), ballot_id)
+                (Ballot._bool_to_SQL(score_only), ballot_id),
             )
 
             db.commit()
@@ -167,9 +169,9 @@ class Ballot:
                     DELETE FROM {ballot_table}
                         WHERE id = %s
                 """,
-                (ballot_id,)
+                (ballot_id,),
             )
-            
+
             db.commit()
 
             return True

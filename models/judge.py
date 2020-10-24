@@ -96,7 +96,7 @@ class Judge:
                         SET email = %s
                     WHERE id = %s
                 """,
-                (email, judge_id)
+                (email, judge_id),
             )
 
             db.commit()
@@ -111,7 +111,7 @@ class Judge:
                         FROM {judge_table}
                     WHERE id = %s
                 """,
-                (judge_id, )
+                (judge_id,),
             )
 
             (email,) = cursor.fetchone()

@@ -70,17 +70,23 @@ class Team(graphene.ObjectType):
                 for matchup in matchups
             ]
             ballots = [Matchup.resolve_ballots(matchup, info) for matchup in matchups]
+
             pds = [
                 [Ballot.resolve_pd(ballot, info, side) for ballot in round_ballots]
                 for round_ballots, side in zip(ballots, sides)
             ]
+            complete = [
+                [Ballot.resolve_complete(ballot, info) for ballot in round_ballots]
+                for round_ballots in ballots
+            ]
+            
             results = [
                 [
                     Result.WIN if pd > 0 else Result.TIE if pd == 0 else Result.LOSS
-                    for pd in round_pds
-                    if pd is not None
+                    for (pd, is_complete) in zip(round_pds, round_completed)
+                    if pd is not None and is_complete
                 ]
-                for round_pds in pds
+                for (round_pds, round_completed) in zip(pds, complete)
             ]
             parent.record = calculate_record(results)
 
@@ -262,13 +268,13 @@ class Ballot(graphene.ObjectType):
 
     @staticmethod
     def resolve_presiding(parent, info):
-        return models.Ballot.get_ballot(parent.id)['presiding']
+        return models.Ballot.get_ballot(parent.id)["presiding"]
 
     note_only = graphene.Boolean(required=True)
 
     @staticmethod
     def resolve_note_only(parent, info):
-        return models.Ballot.get_ballot(parent.id)['note_only']
+        return models.Ballot.get_ballot(parent.id)["note_only"]
 
 
 class MatchupWitness(graphene.ObjectType):

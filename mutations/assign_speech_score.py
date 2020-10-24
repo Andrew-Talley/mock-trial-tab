@@ -5,6 +5,7 @@ from models import BallotSections
 
 from .protect_ballot_code import protect_ballot_code
 
+
 class AssignSpeechScore(graphene.Mutation):
     class Arguments:
         ballot = graphene.ID(required=True)

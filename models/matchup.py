@@ -73,7 +73,7 @@ class Matchup:
                         FROM {matchup_table}
                     WHERE id = %s
                 """,
-                (matchup_id,)
+                (matchup_id,),
             )
 
             (notes,) = cursor.fetchone()
@@ -90,9 +90,9 @@ class Matchup:
                         SET notes = %s
                     WHERE id = %s
                 """,
-                (notes, matchup_id,)
+                (notes, matchup_id,),
             )
 
             db.commit()
-            
+
             return True

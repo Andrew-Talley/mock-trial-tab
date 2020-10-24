@@ -430,6 +430,17 @@ class TestGraphQLServerBase(GraphQLTestCase):
 
         return result.data['assignExamScore']
 
+    def complete_ballot(self, ballot):
+        result = schema.execute(f"""
+            mutation completeBallot {{
+                completeBallot(tournament: {self.tourn_id}, ballot: {ballot}) {{
+                    complete
+                }}
+            }}
+        """)
+
+        return result.data['completeBallot']
+
     def assign_full_round(self, ballot, pd):
         pl_scores = chain(repeat(10, pd), repeat(9))
         def_scores = repeat(9)

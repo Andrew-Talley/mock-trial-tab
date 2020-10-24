@@ -135,7 +135,9 @@ class Tournament(graphene.ObjectType):
     def resolve_outstanding_competitors(parent, info, role):
         return [
             IndividualAward(
-                side=Side.PL, ranks=s['ranks'], student=Student(id=s["id"], name=s["name"])
+                side=Side.PL,
+                ranks=s["ranks"],
+                student=Student(id=s["id"], name=s["name"]),
             )
             for s in SQLTournament.get_all_witness_awards(parent.id)
         ]

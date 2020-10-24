@@ -125,15 +125,9 @@ class TestScoring(TestGraphQLServerBase):
 
         self.assertBallotIsDone(ballot, False)
         
-        result = schema.execute(f"""
-            mutation completeBallot {{
-                completeBallot(tournament: {self.tourn_id}, ballot: {ballot}) {{
-                    complete
-                }}
-            }}
-        """)
+        ballot_info = self.complete_ballot(ballot)
 
 
-        self.assertTrue(result.data['completeBallot']['complete'])
+        self.assertTrue(ballot_info['complete'])
 
         self.assertBallotIsDone(ballot)

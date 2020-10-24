@@ -61,6 +61,25 @@ class TestJudges(TestGraphQLServerBase):
         self.assertJudgeHasBallot(judge, new_ballot)
         self.assertMatchupHasBallot(matchup, new_ballot)
 
+    def test_can_assign_email(self):
+        judge = self.add_judge_to_tournament("John G. Roberts, Jr.")['id']
+
+        result = schema.execute(
+            f"""
+                mutation assignEmail {{
+                    assignJudgeEmail(tournament: {self.tourn_id}, judge: {judge}, email: "fake@fake.com") {{
+                        id
+                        email
+                    }}
+                }}
+            """
+        )
+
+        result = result.data['assignJudgeEmail']
+
+        self.assertEqual(result['id'], judge)
+        self.assertEqual(result['email'], "fake@fake.com")
+
     def test_can_delete_ballot(self):
         matchup, judge, ballot = self.add_one_matchup_w_judge()
 

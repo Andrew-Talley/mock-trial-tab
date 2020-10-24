@@ -24,6 +24,7 @@ from .assign_exam_notes import AssignExamNotes
 from .assign_individual_award import AssignIndividualAward
 from .delete_ballot import DeleteBallot
 from .assign_matchup_notes import AssignMatchupNotes
+from .assign_email import AssignEmail
 
 
 class CreateTournament(graphene.Mutation):
@@ -109,6 +110,7 @@ class Mutation(graphene.ObjectType):
 
     add_judge = AddJudge.Field(required=True)
     add_judge_conflict = AddJudgeConflict.Field(required=True)
+    assign_judge_email = AssignEmail.Field(required=True)
     assign_judge_to_matchup = AssignJudgeToMatchup.Field(required=True)
 
     assign_witness_order = AssignWitnessOrder.Field(required=True)

@@ -436,3 +436,9 @@ class Judge(graphene.ObjectType):
     def resolve_conflicts(parent, info):
         school_names = models.Judge.get_conflicts(parent.tournament_id, parent.id)
         return [School(name=name) for name in school_names]
+
+    email = graphene.String()
+
+    @staticmethod
+    def resolve_email(parent, info):
+        return models.Judge.get_email(parent.id)

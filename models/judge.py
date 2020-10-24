@@ -85,3 +85,35 @@ class Judge:
                 return None
             else:
                 return ballot_ids[0]
+
+    @staticmethod
+    def set_email(judge_id: int, email: str):
+        with get_cnx() as db:
+            cursor = db.cursor()
+            cursor.execute(
+                f"""
+                    UPDATE {judge_table}
+                        SET email = %s
+                    WHERE id = %s
+                """,
+                (email, judge_id)
+            )
+
+            db.commit()
+
+    @staticmethod
+    def get_email(judge_id: int):
+        with get_cnx() as db:
+            cursor = db.cursor()
+            cursor.execute(
+                f"""
+                    SELECT email
+                        FROM {judge_table}
+                    WHERE id = %s
+                """,
+                (judge_id, )
+            )
+
+            (email,) = cursor.fetchone()
+
+            return email

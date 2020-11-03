@@ -22,3 +22,7 @@ class TestEmailBallot:
       TestEmailBallot.create_info(1, 4114, "*Zoom link*: https://cmu.zoom.us/j/93124206933", 1776, "Cayden Codel", "ccodel@andrew.cmu.edu"),
       TestEmailBallot.create_info(2, 4114, "*Zoom link*: https://cmu.zoom.us/j/fake-data", 1776, "Other Judge", "ccodel@andrew.cmu.edu"),
     ])
+
+
+if __name__ == "__main__":
+  TestEmailBallot.test_email()

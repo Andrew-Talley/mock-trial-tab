@@ -491,18 +491,40 @@ class TestGraphQLServerBase(GraphQLTestCase):
 
     def assign_speech_notes(self, ballot, side, speech, notes):
         result = schema.execute(f"""
-            mutation assignNotes {{
-                assignSpeechNotes(ballot: {ballot}, side: {side}, speech: {speech}, notes: "{notes}")
+            mutation assignNotes($notes: String!) {{
+                assignSpeechNotes(ballot: {ballot}, side: {side}, speech: {speech}, notes: $notes)
             }}
-        """)
+        """, variable_values={"notes": notes})
 
         return result.data['assignSpeechNotes']
 
     def assign_exam_notes(self, ballot, side, exam, witness, cross, notes):
         result = schema.execute(f"""
-            mutation assignExamNotes {{
-                assignExamNotes(ballot: {ballot}, side: {side}, exam: {exam}, witness: {self._to_GQL_bool(witness)}, cross: {self._to_GQL_bool(cross)}, notes: "{notes}")
+            mutation assignExamNotes($notes: String!) {{
+                assignExamNotes(ballot: {ballot}, side: {side}, exam: {exam}, witness: {self._to_GQL_bool(witness)}, cross: {self._to_GQL_bool(cross)}, notes: $notes)
+            }}
+        """, variable_values={"notes": notes})
+
+        return result.data['assignExamNotes']
+
+    def get_matchup_notes(self, matchup):
+        result = schema.execute(f"""
+            query getMatchupNotes {{
+                tournament(id: {self.tourn_id}) {{
+                    matchup(id: {matchup}) {{
+                        notes
+                    }}
+                }}
             }}
         """)
 
-        return result.data['assignExamNotes']
+        return result.data['tournament']['matchup']['notes']
+
+    def set_matchup_notes(self, matchup, notes):
+        result = schema.execute(f"""
+            mutation assignNotes($notes: String!) {{
+                assignMatchupNotes(tournament: {self.tourn_id}, matchup: {matchup}, notes: $notes) {{
+                    notes
+                }}
+            }}
+        """, variable_values={"notes": notes})

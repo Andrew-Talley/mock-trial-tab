@@ -2,6 +2,7 @@ from models.connection import get_cnx, tables
 
 ballot_table = tables["ballot"]
 ballot_info = tables["ballot_info"]
+score_table = tables["scores"]
 ranks_table = tables["ranks"]
 
 
@@ -175,3 +176,32 @@ class Ballot:
             db.commit()
 
             return True
+
+    @staticmethod
+    def is_valid(ballot_id):
+        with get_cnx() as db:
+            cursor = db.cursor()
+            cursor.execute(
+                f"""
+                    SELECT COUNT(*)
+                        FROM {ballot_table} B
+                            INNER JOIN {scores_table} S ON B.id = S.ballot_id
+                    WHERE B.id = %s
+                """,
+                (ballot_id,)
+            )
+
+            (num,) = cursor.fetchone()
+            assert(num == 28)
+
+            cursor.execute(
+                f"""
+                    SELECT COUNT(*)
+                        FROM {ballot_table} B
+                            INNER JOIN {ranks_table} R ON B.id = R.ballot_id
+                    WHERE B.id = %s
+                """,
+                (ballot_id,)
+            )
+
+            (ranks_cnt,) = cursor.fetchone()

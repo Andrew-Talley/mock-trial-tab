@@ -119,13 +119,23 @@ class TestScoring(TestGraphQLServerBase):
 
         self.assertBallotIsDone(ballot, False)
 
-    def test_can_complete_round_after_score(self):
+    def test_cannot_complete_ballot_without_all_scores(self):
+        _, _, ballot = self.add_one_matchup_w_judge()
+        self.assign_speech_score(ballot, "PL", "OPENING", 8)
+        self.assign_speech_score(ballot, "DEF", "OPENING", 9)
+
+        with self.assertRaises(Exception):
+            self.complete_ballot(ballot)
+
+    def test_can_complete_round_after_score_and_ranks(self):
         _, _, ballot = self.add_one_matchup_w_judge()
         self.assign_full_round(ballot, 13)
 
         self.assertBallotIsDone(ballot, False)
         
         ballot_info = self.complete_ballot(ballot)
+
+        
 
 
         self.assertTrue(ballot_info['complete'])

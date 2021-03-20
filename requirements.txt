@@ -13,7 +13,7 @@ graphql-relay==2.0.1
 graphql-server-core==1.2.0
 gunicorn==20.0.4
 itsdangerous==1.1.0
-Jinja2==2.11.2
+Jinja2==2.11.3
 MarkupSafe==1.1.1
 mysql-connector-python==8.0.21
 pathspec==0.8.0

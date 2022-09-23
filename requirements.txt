@@ -18,7 +18,7 @@ MarkupSafe==1.1.1
 mysql-connector-python==8.0.21
 pathspec==0.8.0
 promise==2.3
-protobuf==3.12.4
+protobuf==3.18.3
 python-dotenv==0.14.0
 regex==2020.7.14
 Rx==1.6.1
